@@ -14,8 +14,30 @@ import { GarageStore } from '../../core/services/garage-store.service';
           <h1>Histórico de serviços</h1>
           <p>{{ history().length }} serviços · {{ totalCostLabel() }} em custos informados</p>
         </div>
-        <a class="button button-primary" routerLink="/maintenance/new">＋ Novo registro</a>
+        <a
+          class="button button-primary"
+          [routerLink]="store.setup().completed ? '/maintenance/new' : '/motorcycle'"
+        >
+          {{ store.setup().completed ? '＋ Novo registro' : 'Configurar minha NX200' }}
+        </a>
       </header>
+
+      @if (!store.setup().completed) {
+        <section class="setup-banner" role="status">
+          <div>
+            <strong>Histórico demonstrativo</strong>
+            <p>
+              Os registros abaixo são exemplos e não foram confirmados como serviços da sua moto.
+            </p>
+          </div>
+          <a class="button button-secondary" routerLink="/motorcycle">Configurar agora</a>
+        </section>
+      }
+
+      <p class="settings-footnote history-order-note">
+        Serviços são ordenados pela data; quando a data é igual, a maior quilometragem aparece
+        primeiro. Um registro antigo nunca substitui a execução mais recente do plano.
+      </p>
 
       <section class="history-list" aria-label="Serviços realizados">
         @for (service of history(); track service.id; let index = $index) {
@@ -28,6 +50,9 @@ import { GarageStore } from '../../core/services/garage-store.service';
                 <div>
                   <span class="card-label">{{ formatDate(service.date) }}</span>
                   <h2>{{ service.title }}</h2>
+                  @if (service.isDemo) {
+                    <span class="demo-tag">Demonstração</span>
+                  }
                 </div>
                 <strong>{{ service.mileage.toLocaleString('pt-BR') }} km</strong>
               </div>
@@ -65,7 +90,7 @@ import { GarageStore } from '../../core/services/garage-store.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HistoryPage {
-  private readonly store = inject(GarageStore);
+  protected readonly store = inject(GarageStore);
   protected readonly history = this.store.serviceHistory;
   protected readonly totalCostLabel = computed(() =>
     this.formatCurrency(this.history().reduce((total, service) => total + (service.cost ?? 0), 0)),

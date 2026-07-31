@@ -91,13 +91,13 @@ export const NX200_MAINTENANCE_PLAN: readonly MaintenancePlanItem[] = [
 ];
 
 export const INITIAL_GARAGE_STATE: GarageState = {
-  version: 1,
+  schemaVersion: 2,
   motorcycle: {
     id: 'nx200-primary',
     manufacturer: 'Honda',
     model: 'NX200',
     nickname: 'Minha NX',
-    year: 1994,
+    year: 1997,
     currentMileage: 28750,
     createdAt: '2026-01-10T10:00:00.000Z',
     updatedAt: '2026-07-28T10:00:00.000Z',
@@ -114,6 +114,7 @@ export const INITIAL_GARAGE_STATE: GarageState = {
       parts: [{ name: 'Lubrificante para corrente', quantity: 1 }],
       notes: 'Tensão conferida visualmente; valor técnico ainda precisa ser validado.',
       createdAt: '2026-07-08T14:00:00.000Z',
+      isDemo: true,
     },
     {
       id: 'demo-oil',
@@ -125,10 +126,16 @@ export const INITIAL_GARAGE_STATE: GarageState = {
       cost: 82.5,
       parts: [{ name: 'Óleo do motor', quantity: 1 }],
       createdAt: '2026-05-12T14:00:00.000Z',
+      isDemo: true,
     },
   ],
+  odometerHistory: [],
   settings: {
     maintenanceAlertsEnabled: true,
+  },
+  setup: {
+    completed: false,
+    demoData: true,
   },
 };
 

@@ -6,12 +6,7 @@ export class LocalStorageAdapter extends StoragePort {
   private readonly prefix = 'garage_';
 
   get<T>(key: string): T | null {
-    const storage = this.storage;
-    if (!storage) {
-      return null;
-    }
-
-    const rawValue = storage.getItem(this.prefixed(key));
+    const rawValue = this.getRaw(key);
     if (!rawValue) {
       return null;
     }
@@ -23,12 +18,28 @@ export class LocalStorageAdapter extends StoragePort {
     }
   }
 
+  getRaw(key: string): string | null {
+    return this.storage?.getItem(this.prefixed(key)) ?? null;
+  }
+
   set<T>(key: string, value: T): void {
-    this.storage?.setItem(this.prefixed(key), JSON.stringify(value));
+    this.setRaw(key, JSON.stringify(value));
+  }
+
+  setRaw(key: string, value: string): void {
+    const storage = this.storage;
+    if (!storage) {
+      throw new Error('LocalStorage is unavailable.');
+    }
+    storage.setItem(this.prefixed(key), value);
   }
 
   remove(key: string): void {
-    this.storage?.removeItem(this.prefixed(key));
+    const storage = this.storage;
+    if (!storage) {
+      throw new Error('LocalStorage is unavailable.');
+    }
+    storage.removeItem(this.prefixed(key));
   }
 
   private get storage(): Storage | null {

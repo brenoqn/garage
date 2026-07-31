@@ -3,7 +3,7 @@ import { MaintenancePlanItem } from '../models/maintenance.model';
 import { calculateMaintenanceSchedule } from './maintenance-calculator';
 
 const source = {
-  status: 'needs-confirmation' as const,
+  status: 'confirmed' as const,
   label: 'Fonte de teste',
 };
 
@@ -21,6 +21,21 @@ function planItem(changes: Partial<MaintenancePlanItem> = {}): MaintenancePlanIt
 }
 
 describe('calculateMaintenanceSchedule', () => {
+  it('keeps unconfirmed intervals out of operational calculations', () => {
+    const schedule = calculateMaintenanceSchedule(
+      planItem({
+        technicalSource: {
+          status: 'needs-confirmation',
+          label: 'Intervalo ainda não validado',
+        },
+      }),
+      99_999,
+      '2026-12-31',
+    );
+
+    expect(schedule).toEqual({ status: 'unknown' });
+  });
+
   it('returns unknown when no execution is available', () => {
     const schedule = calculateMaintenanceSchedule(
       planItem({ lastExecution: undefined }),
@@ -30,6 +45,13 @@ describe('calculateMaintenanceSchedule', () => {
 
     expect(schedule.status).toBe('unknown');
     expect(schedule.nextMileage).toBeUndefined();
+  });
+
+  it('returns unknown for invalid mileage or dates instead of reporting an item as ok', () => {
+    expect(calculateMaintenanceSchedule(planItem(), Number.NaN, '2026-02-01').status).toBe(
+      'unknown',
+    );
+    expect(calculateMaintenanceSchedule(planItem(), 10_500, 'invalid').status).toBe('unknown');
   });
 
   it('calculates the next mileage and keeps an item ok outside its warning window', () => {

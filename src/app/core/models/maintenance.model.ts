@@ -36,5 +36,11 @@ export interface MaintenanceAlert {
   readonly itemId: string;
   readonly title: string;
   readonly status: Extract<MaintenanceStatus, 'upcoming' | 'due' | 'overdue'>;
+  readonly reason: string;
   readonly message: string;
+  readonly nextDate?: string;
+  readonly nextMileage?: number;
+  readonly remainingDays?: number;
+  readonly remainingKm?: number;
+  readonly actionLabel: string;
 }

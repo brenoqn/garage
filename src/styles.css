@@ -4,24 +4,24 @@
   --font-display: 'Arial Narrow', 'Roboto Condensed', Impact, ui-sans-serif, system-ui, sans-serif;
   --ink: #17211e;
   --ink-soft: #36443f;
-  --ink-muted: #6e7b76;
+  --ink-muted: #64716c;
   --ink-inverse: #fffdf8;
   --surface: #f4f1ea;
   --surface-strong: #fffdf8;
   --surface-subtle: #ebe7de;
   --border: #ded9cf;
   --accent: #f26d3d;
-  --accent-strong: #c94b20;
+  --accent-strong: #b83f19;
   --accent-soft: #ffeadf;
-  --ok: #2c7a5b;
+  --ok: #276b50;
   --ok-soft: #e2f2ea;
-  --upcoming: #aa6b0b;
+  --upcoming: #805006;
   --upcoming-soft: #fff1ce;
-  --due: #c45d22;
+  --due: #9b3f12;
   --due-soft: #ffeadf;
   --overdue: #b63c36;
   --overdue-soft: #fbe5e3;
-  --unknown: #66736e;
+  --unknown: #596661;
   --unknown-soft: #eceeec;
   --shadow-sm: 0 1px 2px rgb(22 31 28 / 5%), 0 6px 20px rgb(22 31 28 / 4%);
   --shadow-md: 0 12px 38px rgb(29 38 34 / 10%);
@@ -75,7 +75,7 @@ button {
 }
 
 :focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--accent) 70%, white);
+  outline: 3px solid var(--accent-strong);
   outline-offset: 3px;
 }
 
@@ -202,13 +202,13 @@ h2 {
 }
 
 .button-primary {
-  background: var(--accent);
+  background: var(--accent-strong);
   color: var(--ink-inverse);
   box-shadow: var(--shadow-accent);
 }
 
 .button-primary:hover {
-  background: var(--accent-strong);
+  background: #8f2f13;
 }
 
 .button-secondary,
@@ -1692,7 +1692,7 @@ textarea::placeholder {
   margin: 0.3rem 0 0.8rem;
 }
 
-.confirm-box > div {
+.confirm-box > div:last-child {
   display: flex;
   gap: 0.5rem;
   justify-content: flex-end;
@@ -1707,7 +1707,7 @@ textarea::placeholder {
 
 .brand-mark {
   align-items: center;
-  background: var(--accent);
+  background: var(--accent-strong);
   border-radius: var(--radius-md);
   color: white;
   display: flex;
@@ -1741,6 +1741,202 @@ textarea::placeholder {
   display: none;
 }
 
+.setup-banner,
+.recovery-banner {
+  align-items: flex-start;
+  background: var(--upcoming-soft);
+  border: 1px solid #dfc57e;
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+}
+
+.recovery-banner {
+  background: var(--overdue-soft);
+  border-color: #d9a49f;
+}
+
+.setup-banner p,
+.recovery-banner p {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  margin: 0.35rem 0 0;
+}
+
+.bike-hero > .button-light {
+  bottom: 1.25rem;
+  left: 1.25rem;
+  position: absolute;
+  z-index: 2;
+}
+
+.detailed-alert {
+  align-items: start;
+  padding-block: 1rem;
+}
+
+.detailed-alert > div {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.detailed-alert .text-button {
+  color: var(--accent-strong);
+  justify-self: start;
+  margin-left: -0.5rem;
+  text-decoration: none;
+}
+
+.alert-forecast,
+.backup-summary {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0.5rem 0;
+}
+
+.alert-forecast div,
+.backup-summary div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.alert-forecast dt,
+.backup-summary dt {
+  color: var(--ink-muted);
+  font-size: 0.65rem;
+}
+
+.alert-forecast dd,
+.backup-summary dd {
+  font-size: 0.75rem;
+  font-weight: 750;
+  margin: 0;
+}
+
+.dashboard-regression {
+  margin-bottom: 1rem;
+}
+
+.regression-confirm .form-field {
+  margin-bottom: 0.8rem;
+}
+
+.confirmation-check {
+  align-items: flex-start;
+  display: flex;
+  font-size: 0.76rem;
+  font-weight: 700;
+  gap: 0.65rem;
+  line-height: 1.45;
+  margin: 0.8rem 0;
+}
+
+.confirmation-check input {
+  flex: 0 0 auto;
+  min-height: 1.25rem;
+  width: 1.25rem;
+}
+
+.file-button {
+  position: relative;
+}
+
+.file-button input {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+
+.file-button:focus-within {
+  outline: 3px solid var(--accent-strong);
+  outline-offset: 3px;
+}
+
+.import-message {
+  display: block;
+  margin-top: 1rem;
+}
+
+.import-preview {
+  border-top: 1px solid var(--border);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.import-preview h3 {
+  margin-bottom: 0;
+}
+
+.backup-summary {
+  background: var(--surface-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.85rem;
+}
+
+.odometer-section {
+  margin-bottom: 1rem;
+}
+
+.history-order-note {
+  margin-bottom: 1rem;
+}
+
+.demo-tag {
+  background: var(--upcoming-soft);
+  border-radius: 999px;
+  color: var(--upcoming);
+  display: inline-flex;
+  font-size: 0.65rem;
+  font-weight: 800;
+  margin-top: 0.35rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.odometer-section .section-heading > span {
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+}
+
+.odometer-list {
+  overflow: hidden;
+}
+
+.odometer-row {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.9rem 1rem;
+}
+
+.odometer-row + .odometer-row {
+  border-top: 1px solid var(--border);
+}
+
+.odometer-row > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.odometer-row > div:last-child {
+  color: var(--ink-muted);
+  font-size: 0.72rem;
+}
+
+.odometer-row small {
+  color: var(--ink-muted);
+  line-height: 1.4;
+}
+
+.empty-state.compact {
+  min-height: 8rem;
+}
+
 @media (min-width: 40rem) {
   .page {
     padding: 2rem 1.5rem 4rem;
@@ -1762,6 +1958,27 @@ textarea::placeholder {
     max-width: 23rem;
     right: auto;
     width: 100%;
+  }
+
+  .bike-hero > .button-light {
+    bottom: 2rem;
+    left: 2rem;
+  }
+
+  .setup-banner,
+  .recovery-banner {
+    align-items: center;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
+  .odometer-row {
+    align-items: start;
+    grid-template-columns: minmax(0, 0.65fr) minmax(0, 1fr);
+  }
+
+  .odometer-row > div:last-child {
+    text-align: right;
   }
 
   .bike-visual {
@@ -1848,6 +2065,11 @@ textarea::placeholder {
 
   .dashboard-heading,
   .bike-hero,
+  .dashboard-page > .setup-banner,
+  .dashboard-page > .recovery-banner,
+  .dashboard-page > .confirm-box,
+  .dashboard-page > .success-message,
+  .dashboard-page > .import-message,
   .dashboard-page > .metric-grid,
   .dashboard-page > .demo-disclaimer {
     grid-column: 1 / -1;

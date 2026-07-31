@@ -14,6 +14,7 @@ export interface ServiceRecord {
   readonly parts: readonly ServicePart[];
   readonly notes?: string;
   readonly createdAt: string;
+  readonly isDemo?: boolean;
 }
 
 export type NewServiceRecord = Omit<ServiceRecord, 'id' | 'createdAt'>;

@@ -6,6 +6,17 @@ import {
 
 const DAY_IN_MS = 86_400_000;
 
+function isValidIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+  );
+}
+
 function parseLocalDate(value: string): Date {
   const [year, month, day] = value.split('-').map(Number);
   return new Date(year, month - 1, day);
@@ -66,8 +77,18 @@ export function calculateMaintenanceSchedule(
   currentMileage: number,
   today: string,
 ): MaintenanceSchedule {
+  if (item.technicalSource.status !== 'confirmed') {
+    return { status: 'unknown' };
+  }
+
   const execution = item.lastExecution;
-  if (!execution) {
+  if (
+    !execution ||
+    !Number.isFinite(currentMileage) ||
+    currentMileage < 0 ||
+    !isValidIsoDate(today) ||
+    !isValidIsoDate(execution.date)
+  ) {
     return { status: 'unknown' };
   }
 

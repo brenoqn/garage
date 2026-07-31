@@ -4,7 +4,7 @@
 
 Garage ajuda proprietários de motocicletas a compreender, planejar e registrar manutenção sem
 transformar a experiência em um painel corporativo ou em um manual técnico opaco. A interface
-deve conduzir a próxima ação: conferir o estado da moto, aprender um procedimento ou registrar
+deve conduzir a próxima ação: confirmar os dados da moto, aprender um procedimento ou registrar
 o que foi feito.
 
 ## Público inicial
@@ -13,29 +13,33 @@ Proprietários de Honda NX200 que desejam organizar os cuidados da motocicleta e
 orientações progressivas. O Garage não substitui um mecânico qualificado nem documentação
 técnica oficial.
 
-## Recorte do MVP
+## Recorte do MVP atual
 
 - uma única motocicleta ativa;
 - somente Honda NX200;
-- dados armazenados no dispositivo;
-- plano preventivo e histórico;
+- configuração inicial antes de ativar alertas;
+- dados armazenados no dispositivo, com migração e backup;
+- histórico de serviços e leituras do odômetro;
+- plano preventivo com intervalos não confirmados inativos;
 - seis procedimentos demonstrativos;
 - alertas dentro do aplicativo;
 - modo claro e instalação como PWA.
 
 Não fazem parte desta etapa: outras motos, backend, autenticação, sincronização, colaboração,
-notificações push, compra de peças ou diagnósticos automatizados.
+notificações push, checklists de execução, compra de peças ou diagnósticos automatizados.
 
 ## Princípios de experiência
 
-- **Próxima ação evidente:** a prioridade de manutenção deve ser compreendida em segundos.
+- **Próxima ação evidente:** uma prioridade confirmada deve ser compreendida em segundos.
+- **Dados honestos:** demonstrações são identificadas e não viram alertas antes da configuração.
 - **Aprendizado seguro:** cada procedimento começa por riscos e termina por verificações.
 - **Honestidade técnica:** um valor desconhecido é mostrado como `A confirmar`, nunca estimado.
+- **Controle do usuário:** importações e reduções do odômetro exigem confirmação explícita.
+- **Histórico imutável:** correções atuais não reescrevem serviços ou leituras antigas.
 - **Uso na oficina:** controles grandes, contraste e leitura rápida em telas pequenas.
-- **Histórico útil:** registrar um serviço deve atualizar o plano sem trabalho duplicado.
 
 ## Métricas futuras
 
-Quando houver telemetria consentida, avaliar: conclusão do cadastro, atualização de
-quilometragem, serviços registrados, procedimentos concluídos e instalações da PWA. Não há
-coleta de telemetria neste MVP.
+Quando houver telemetria consentida, avaliar: conclusão da configuração, atualizações de
+quilometragem, serviços registrados, backups concluídos e instalações da PWA. Não há coleta de
+telemetria neste MVP.
