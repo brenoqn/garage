@@ -32,11 +32,11 @@ interface PlanRow {
 
       <div class="summary-strip" aria-label="Resumo do plano">
         <div>
-          <strong>{{ count('overdue') + count('due') }}</strong
+          <strong>{{ count('overdue') }}</strong
           ><span>vencidas</span>
         </div>
         <div>
-          <strong>{{ count('upcoming') }}</strong
+          <strong>{{ count('upcoming') + count('due') }}</strong
           ><span>próximas</span>
         </div>
         <div>

@@ -191,13 +191,13 @@ export class DashboardPage {
     })),
   );
   protected readonly upcomingCount = computed(
-    () => this.schedules().filter(({ schedule }) => schedule.status === 'upcoming').length,
-  );
-  protected readonly overdueCount = computed(
     () =>
       this.schedules().filter(
-        ({ schedule }) => schedule.status === 'overdue' || schedule.status === 'due',
+        ({ schedule }) => schedule.status === 'upcoming' || schedule.status === 'due',
       ).length,
+  );
+  protected readonly overdueCount = computed(
+    () => this.schedules().filter(({ schedule }) => schedule.status === 'overdue').length,
   );
   protected readonly nextMaintenance = computed(
     () =>
