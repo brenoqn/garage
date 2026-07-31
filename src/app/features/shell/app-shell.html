@@ -1,0 +1,79 @@
+<a class="skip-link" href="#main-content">Pular para o conteúdo</a>
+
+<div class="app-layout">
+  <aside class="side-nav" aria-label="Navegação principal">
+    <a class="brand" routerLink="/dashboard" aria-label="Garage — início">
+      <span class="brand-mark" aria-hidden="true">G</span>
+      <span>
+        <strong>Garage</strong>
+        <small>{{ modelLabel() }}</small>
+      </span>
+    </a>
+
+    <nav>
+      <a routerLink="/dashboard" routerLinkActive="active">
+        <span aria-hidden="true">⌂</span> Visão geral
+      </a>
+      <a routerLink="/maintenance" routerLinkActive="active">
+        <span aria-hidden="true">◇</span> Manutenção
+      </a>
+      <a routerLink="/procedures" routerLinkActive="active">
+        <span aria-hidden="true">☷</span> Procedimentos
+      </a>
+      <a routerLink="/specifications" routerLinkActive="active">
+        <span aria-hidden="true">≡</span> Especificações
+      </a>
+      <a routerLink="/settings" routerLinkActive="active">
+        <span aria-hidden="true">⚙</span> Ajustes
+      </a>
+    </nav>
+
+    <div class="side-bike">
+      <span>Motocicleta ativa</span>
+      <strong>{{ motorcycle().nickname }}</strong>
+      <small>
+        {{ motorcycle().year }} · {{ motorcycle().currentMileage.toLocaleString('pt-BR') }} km
+      </small>
+    </div>
+  </aside>
+
+  <div class="app-content">
+    <header class="mobile-header">
+      <a class="brand" routerLink="/dashboard" aria-label="Garage — início">
+        <span class="brand-mark" aria-hidden="true">G</span>
+        <strong>Garage</strong>
+      </a>
+      <a class="header-bike" routerLink="/motorcycle">
+        {{ motorcycle().nickname }}
+        <span aria-hidden="true">›</span>
+      </a>
+    </header>
+
+    <main id="main-content" tabindex="-1">
+      <router-outlet />
+    </main>
+  </div>
+
+  <nav class="bottom-nav" aria-label="Navegação principal">
+    <a routerLink="/dashboard" routerLinkActive="active">
+      <span aria-hidden="true">⌂</span>
+      <small>Início</small>
+    </a>
+    <a routerLink="/maintenance" routerLinkActive="active">
+      <span aria-hidden="true">◇</span>
+      <small>Plano</small>
+    </a>
+    <a routerLink="/maintenance/new" routerLinkActive="active" class="nav-primary">
+      <span aria-hidden="true">＋</span>
+      <small>Registrar</small>
+    </a>
+    <a routerLink="/procedures" routerLinkActive="active">
+      <span aria-hidden="true">☷</span>
+      <small>Guias</small>
+    </a>
+    <a routerLink="/settings" routerLinkActive="active">
+      <span aria-hidden="true">⚙</span>
+      <small>Ajustes</small>
+    </a>
+  </nav>
+</div>
