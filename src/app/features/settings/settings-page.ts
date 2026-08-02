@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { parseGarageBackup } from '../../core/domain/backup';
 import { GarageBackup, GarageBackupSummary } from '../../core/models/backup.model';
+import { GarageTheme } from '../../core/models/garage-state.model';
 import { GarageStore } from '../../core/services/garage-store.service';
 
 @Component({
@@ -30,6 +31,36 @@ import { GarageStore } from '../../core/services/garage-store.service';
           </button>
         </section>
       }
+
+      <section class="card settings-section">
+        <div class="settings-heading">
+          <span class="settings-icon" aria-hidden="true">◐</span>
+          <div>
+            <h2>Aparência</h2>
+            <p>
+              O tema escuro é o padrão para uso na garagem. Você pode escolher claro ou seguir o
+              dispositivo.
+            </p>
+          </div>
+        </div>
+        <div class="form-field settings-select">
+          <label for="theme-preference">Tema</label>
+          <select
+            id="theme-preference"
+            [value]="store.settings().theme"
+            [disabled]="!!store.recovery()"
+            (change)="changeTheme($event)"
+          >
+            <option value="dark">Escuro</option>
+            <option value="light">Claro</option>
+            <option value="system">Seguir o sistema</option>
+          </select>
+        </div>
+        <p class="settings-footnote">
+          A preferência fica salva neste dispositivo. O Garage também respeita a redução de
+          movimento configurada no sistema.
+        </p>
+      </section>
 
       <section class="card settings-section">
         <div class="settings-heading">
@@ -121,6 +152,22 @@ import { GarageStore } from '../../core/services/garage-store.service';
                 <dt>Atividades de procedimentos</dt>
                 <dd>{{ summary.procedureExecutions }}</dd>
               </div>
+              <div>
+                <dt>Abastecimentos</dt>
+                <dd>{{ summary.fuelRecords }}</dd>
+              </div>
+              <div>
+                <dt>Gastos avulsos</dt>
+                <dd>{{ summary.expenseRecords }}</dd>
+              </div>
+              <div>
+                <dt>Ocorrências</dt>
+                <dd>{{ summary.occurrenceRecords }}</dd>
+              </div>
+              <div>
+                <dt>Inspeções pré-rodagem</dt>
+                <dd>{{ summary.safetyChecks }}</dd>
+              </div>
             </dl>
             <div class="confirm-box" role="alert">
               <strong>Substituir todos os dados atuais?</strong>
@@ -176,7 +223,7 @@ import { GarageStore } from '../../core/services/garage-store.service';
         <div>
           <h2>Garage</h2>
           <p>Base funcional do MVP · Honda NX200</p>
-          <small>Aplicativo web progressivo · modo claro</small>
+          <small>Aplicativo web progressivo · tema {{ themeLabel(store.settings().theme) }}</small>
         </div>
       </section>
     </div>
@@ -198,6 +245,17 @@ export class SettingsPage {
     if (target instanceof HTMLInputElement) {
       this.store.updateSettings(target.checked);
     }
+  }
+
+  protected changeTheme(event: Event): void {
+    const target = event.target;
+    if (target instanceof HTMLSelectElement) {
+      this.store.updateTheme(target.value as GarageTheme);
+    }
+  }
+
+  protected themeLabel(theme: GarageTheme): string {
+    return { dark: 'escuro', light: 'claro', system: 'do sistema' }[theme];
   }
 
   protected exportData(): void {

@@ -10,12 +10,11 @@ export const BATTERY_CHECK_PROCEDURE: Procedure = {
   slug: 'verificacao-da-bateria',
   title: 'Verificação da bateria',
   category: 'Elétrica',
-  description:
-    'Checagem visual do eletrólito, terminais, tubo de respiro e condições externas da bateria.',
+  description: 'Guia visual para observar a bateria, os terminais e o tubo de respiro.',
   difficulty: 'easy',
   ...transcribedEditorialMetadata(
     'moderate',
-    'Curto-circuito, polaridade incorreta ou contato com eletrólito podem causar ferimentos e danos.',
+    'Pare diante de vazamento, carcaça deformada, cabo danificado ou dúvida sobre os terminais. Evite faíscas e procure ajuda.',
   ),
   estimatedMinutes: 20,
   tools: [

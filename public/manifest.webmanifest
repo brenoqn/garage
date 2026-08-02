@@ -1,13 +1,13 @@
 {
   "name": "Garage",
   "short_name": "Garage",
-  "description": "Manutenção guiada e histórico da sua motocicleta.",
-  "theme_color": "#1f2d28",
-  "background_color": "#f4f1ea",
+  "description": "Manutenção básica, abastecimentos, custos e histórico da sua motocicleta.",
+  "theme_color": "#172821",
+  "background_color": "#0d1512",
   "display": "standalone",
   "scope": "/",
   "start_url": "/dashboard",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "categories": ["utilities", "education"],
   "icons": [
     {

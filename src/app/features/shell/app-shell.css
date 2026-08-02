@@ -99,8 +99,11 @@ main {
   backdrop-filter: blur(14px);
 }
 
-.bottom-nav a {
+.bottom-nav a,
+.bottom-nav button {
   align-items: center;
+  background: transparent;
+  border: 0;
   border-radius: 0.8rem;
   color: var(--ink-muted);
   display: flex;
@@ -112,7 +115,8 @@ main {
   text-decoration: none;
 }
 
-.bottom-nav a small {
+.bottom-nav a small,
+.bottom-nav button small {
   font-size: 0.66rem;
   font-weight: 700;
 }
@@ -149,12 +153,25 @@ main {
     padding: 1.5rem;
     position: sticky;
     top: 0;
+    overflow-y: auto;
   }
 
   .side-nav nav {
     display: grid;
     gap: 0.35rem;
     margin-top: 2.5rem;
+  }
+
+  .side-nav .secondary-nav {
+    border-top: 1px solid var(--border);
+    gap: 0.1rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+  }
+
+  .side-nav .secondary-nav a {
+    font-size: 0.76rem;
+    min-height: 2.5rem;
   }
 
   .side-nav nav a {
@@ -198,7 +215,9 @@ main {
   }
 
   .mobile-header,
-  .bottom-nav {
+  .bottom-nav,
+  .sheet-backdrop,
+  .bottom-sheet {
     display: none;
   }
 

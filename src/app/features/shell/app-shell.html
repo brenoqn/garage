@@ -4,79 +4,145 @@
   <aside class="side-nav" aria-label="Navegação principal">
     <a class="brand" routerLink="/dashboard" aria-label="Garage — início">
       <span class="brand-mark" aria-hidden="true">G</span>
-      <span>
-        <strong>Garage</strong>
-        <small>{{ modelLabel() }}</small>
-      </span>
+      <span
+        ><strong>Garage</strong><small>{{ modelLabel() }}</small></span
+      >
     </a>
 
-    <nav>
-      <a routerLink="/dashboard" routerLinkActive="active">
-        <span aria-hidden="true">⌂</span> Visão geral
-      </a>
-      <a routerLink="/maintenance" routerLinkActive="active">
-        <span aria-hidden="true">◇</span> Manutenção
-      </a>
-      <a routerLink="/procedures" routerLinkActive="active">
-        <span aria-hidden="true">☷</span> Procedimentos
-      </a>
-      <a routerLink="/specifications" routerLinkActive="active">
-        <span aria-hidden="true">≡</span> Especificações
-      </a>
-      <a routerLink="/technical-sources" routerLinkActive="active">
-        <span aria-hidden="true">⌕</span> Fontes técnicas
-      </a>
-      <a routerLink="/settings" routerLinkActive="active">
-        <span aria-hidden="true">⚙</span> Ajustes
-      </a>
+    <nav aria-label="Uso cotidiano">
+      <a routerLink="/dashboard" routerLinkActive="active" ariaCurrentWhenActive="page"
+        ><span aria-hidden="true">⌂</span> Início</a
+      >
+      <a routerLink="/maintenance" routerLinkActive="active" ariaCurrentWhenActive="page"
+        ><span aria-hidden="true">◇</span> Manutenção</a
+      >
+      <a routerLink="/maintenance/upcoming" routerLinkActive="active" ariaCurrentWhenActive="page"
+        ><span aria-hidden="true">◷</span> Próximas</a
+      >
+      <a routerLink="/procedures" routerLinkActive="active" ariaCurrentWhenActive="page"
+        ><span aria-hidden="true">☷</span> Fazer</a
+      >
+      <a routerLink="/fuel" routerLinkActive="active" ariaCurrentWhenActive="page"
+        ><span aria-hidden="true">⌁</span> Abastecimentos</a
+      >
+      <a routerLink="/history" routerLinkActive="active" ariaCurrentWhenActive="page"
+        ><span aria-hidden="true">↺</span> Histórico</a
+      >
+      <a routerLink="/expenses" routerLinkActive="active" ariaCurrentWhenActive="page"
+        ><span aria-hidden="true">$</span> Gastos</a
+      >
+    </nav>
+
+    <nav class="secondary-nav" aria-label="Referências e ajustes">
+      <a routerLink="/motorcycle" routerLinkActive="active" ariaCurrentWhenActive="page"
+        >Minha motocicleta</a
+      >
+      <a routerLink="/specifications" routerLinkActive="active" ariaCurrentWhenActive="page"
+        >Especificações</a
+      >
+      <a routerLink="/technical-sources" routerLinkActive="active" ariaCurrentWhenActive="page"
+        >Fontes técnicas</a
+      >
+      <a routerLink="/settings" routerLinkActive="active" ariaCurrentWhenActive="page"
+        >Ajustes e backup</a
+      >
     </nav>
 
     <div class="side-bike">
-      <span>Motocicleta ativa</span>
-      <strong>{{ motorcycle().nickname }}</strong>
-      <small>
-        {{ motorcycle().year }} · {{ motorcycle().currentMileage.toLocaleString('pt-BR') }} km
-      </small>
+      <span>Motocicleta ativa</span><strong>{{ motorcycle().nickname }}</strong
+      ><small
+        >{{ motorcycle().year }} ·
+        {{ motorcycle().currentMileage.toLocaleString('pt-BR') }} km</small
+      >
     </div>
   </aside>
 
   <div class="app-content">
     <header class="mobile-header">
-      <a class="brand" routerLink="/dashboard" aria-label="Garage — início">
-        <span class="brand-mark" aria-hidden="true">G</span>
-        <strong>Garage</strong>
-      </a>
-      <a class="header-bike" routerLink="/motorcycle">
-        {{ motorcycle().nickname }}
-        <span aria-hidden="true">›</span>
-      </a>
+      <a class="brand" routerLink="/dashboard" aria-label="Garage — início"
+        ><span class="brand-mark" aria-hidden="true">G</span><strong>Garage</strong></a
+      >
+      <a class="header-bike" routerLink="/motorcycle"
+        >{{ motorcycle().nickname }}<span aria-hidden="true">›</span></a
+      >
     </header>
-
-    <main id="main-content" tabindex="-1">
-      <router-outlet />
-    </main>
+    <main id="main-content" tabindex="-1"><router-outlet /></main>
   </div>
 
   <nav class="bottom-nav" aria-label="Navegação principal">
-    <a routerLink="/dashboard" routerLinkActive="active">
-      <span aria-hidden="true">⌂</span>
-      <small>Início</small>
-    </a>
-    <a routerLink="/maintenance" routerLinkActive="active">
-      <span aria-hidden="true">◇</span>
-      <small>Plano</small>
-    </a>
-    <a routerLink="/maintenance/new" routerLinkActive="active" class="nav-primary">
-      <span aria-hidden="true">＋</span>
-      <small>Registrar</small>
-    </a>
-    <a routerLink="/procedures" routerLinkActive="active">
-      <span aria-hidden="true">☷</span>
-      <small>Guias</small>
-    </a>
-    <a routerLink="/settings" routerLinkActive="active">
-      <span aria-hidden="true">⚙</span>
-      <small>Ajustes</small>
-    </a>
+    <a routerLink="/dashboard" routerLinkActive="active" ariaCurrentWhenActive="page"
+      ><span aria-hidden="true">⌂</span><small>Início</small></a
+    >
+    <a routerLink="/maintenance" routerLinkActive="active" ariaCurrentWhenActive="page"
+      ><span aria-hidden="true">◇</span><small>Manutenção</small></a
+    >
+    <button
+      type="button"
+      class="nav-primary"
+      [attr.aria-expanded]="quickMenuOpen()"
+      aria-controls="quick-actions"
+      (click)="quickMenuOpen.set(true)"
+    >
+      <span aria-hidden="true">＋</span><small>Fazer</small>
+    </button>
+    <a routerLink="/fuel/new" routerLinkActive="active" ariaCurrentWhenActive="page"
+      ><span aria-hidden="true">⌁</span><small>Abastecer</small></a
+    >
+    <a routerLink="/history" routerLinkActive="active" ariaCurrentWhenActive="page"
+      ><span aria-hidden="true">↺</span><small>Histórico</small></a
+    >
   </nav>
+
+  @if (quickMenuOpen()) {
+    <div class="sheet-backdrop" (click)="closeQuickMenu()" aria-hidden="true"></div>
+    <section
+      id="quick-actions"
+      class="bottom-sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="quick-actions-title"
+    >
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="inline-between">
+        <div>
+          <p class="eyebrow">Registro rápido</p>
+          <h2 id="quick-actions-title">O que aconteceu?</h2>
+        </div>
+        <button
+          class="icon-button"
+          type="button"
+          aria-label="Fechar ações rápidas"
+          (click)="closeQuickMenu()"
+        >
+          ×
+        </button>
+      </div>
+      <div class="sheet-action-grid">
+        <a routerLink="/fuel/new" (click)="closeQuickMenu()"
+          ><span aria-hidden="true">⌁</span><strong>Abastecimento</strong
+          ><small>Litros, custo e km/L</small></a
+        >
+        <a routerLink="/maintenance/new" (click)="closeQuickMenu()"
+          ><span aria-hidden="true">◇</span><strong>Manutenção</strong
+          ><small>Serviço concluído</small></a
+        >
+        <a routerLink="/dashboard" (click)="closeQuickMenu()"
+          ><span aria-hidden="true">⌖</span><strong>Quilometragem</strong
+          ><small>Atualizar odômetro</small></a
+        >
+        <a routerLink="/occurrences/new" (click)="closeQuickMenu()"
+          ><span aria-hidden="true">!</span><strong>Ocorrência</strong
+          ><small>Ruído, falha ou observação</small></a
+        >
+        <a routerLink="/safety-check" (click)="closeQuickMenu()"
+          ><span aria-hidden="true">✓</span><strong>Checklist</strong
+          ><small>Antes de rodar</small></a
+        >
+        <a routerLink="/expenses" (click)="closeQuickMenu()"
+          ><span aria-hidden="true">$</span><strong>Gasto</strong
+          ><small>Peças e outros custos</small></a
+        >
+      </div>
+    </section>
+  }
 </div>

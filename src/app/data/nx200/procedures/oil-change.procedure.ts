@@ -11,11 +11,11 @@ export const OIL_CHANGE_PROCEDURE: Procedure = {
   title: 'Troca de óleo',
   category: 'Motor',
   description:
-    'Roteiro guiado para drenar o óleo usado, revisar a vedação e completar o motor com o produto correto.',
+    'Guia direto para retirar o óleo usado, conferir as peças visíveis e repor o óleo indicado.',
   difficulty: 'moderate',
   ...transcribedEditorialMetadata(
     'moderate',
-    'Erros podem causar vazamentos, lubrificação inadequada ou dano ao motor.',
+    'Pare se houver rosca danificada, peça faltando, vazamento ou dúvida sobre o aperto. Procure um profissional antes de ligar o motor.',
   ),
   estimatedMinutes: 45,
   tools: [
@@ -49,7 +49,7 @@ export const OIL_CHANGE_PROCEDURE: Procedure = {
       id: 'oil-step-drain',
       title: 'Drene o óleo',
       description:
-        'Remova o medidor de nível; retire o bujão, a mola e o filtro de tela e deixe o óleo drenar.',
+        'Retire o medidor de nível. Depois, retire o bujão, a mola e o filtro de tela. Espere o óleo parar de escorrer.',
       required: true,
       safetyNote: 'Use luvas e evite contato com óleo quente.',
     },
@@ -64,7 +64,7 @@ export const OIL_CHANGE_PROCEDURE: Procedure = {
       id: 'oil-step-refill',
       title: 'Reabasteça',
       description:
-        'O manual transcreve aproximadamente 1,1 L para a troca e 15 N·m no bujão; não use o torque antes do confronto com o manual de serviço.',
+        'Recoloque o conjunto e adicione o óleo aos poucos. Os valores exibidos na referência técnica ainda aguardam revisão; não improvise o aperto.',
       required: true,
     },
     {

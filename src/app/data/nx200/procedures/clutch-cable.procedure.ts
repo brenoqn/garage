@@ -10,11 +10,11 @@ export const CLUTCH_CABLE_PROCEDURE: Procedure = {
   slug: 'regulagem-cabo-embreagem',
   title: 'Regulagem do cabo da embreagem',
   category: 'Comandos',
-  description: 'Inspeção do cabo, medição da folga do manete e ajuste progressivo do acionamento.',
+  description: 'Guia para observar o cabo, sentir o movimento do manete e conferir a folga.',
   difficulty: 'easy',
   ...transcribedEditorialMetadata(
     'moderate',
-    'Folga ou roteamento incorreto pode afetar o acionamento e o controle da motocicleta.',
+    'Pare se o cabo estiver desfiado, preso ou sem ajuste possível. Não rode antes de uma avaliação profissional.',
   ),
   estimatedMinutes: 25,
   tools: [
@@ -40,7 +40,8 @@ export const CLUTCH_CABLE_PROCEDURE: Procedure = {
     {
       id: 'clutch-step-measure',
       title: 'Meça a folga',
-      description: 'Meça na extremidade do manete; o manual transcreve folga de 10–20 mm.',
+      description:
+        'Meça na ponta do manete e consulte o valor na referência técnica, ainda pendente de revisão.',
       required: true,
     },
     {

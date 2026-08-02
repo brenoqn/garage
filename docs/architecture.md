@@ -11,7 +11,7 @@ UI / rotas
     ↓
 GarageStore + catálogo editorial estático + serviços de navegador
     ↓
-regras puras: conteúdo técnico, execução, migração, backup, odômetro e manutenção
+regras puras: conteúdo técnico, execução, migração, backup, odômetro, consumo e manutenção
     ↓
 StoragePort
     ↓
@@ -34,6 +34,7 @@ data/nx200/
 ├── specifications/       # agrupamento visual por sistema → claimId
 ├── procedures/           # seis procedimentos e metadados editoriais
 ├── maintenance-plan/     # seed do plano e referências estáveis às claims
+├── safety/               # checklist pré-rodagem estático e citado
 ├── initial-garage-state.data.ts
 └── nx200-catalog.ts      # composição validada
 ```
@@ -47,7 +48,7 @@ eventual supersessão. `ContentRevision` é a versão editorial do procedimento 
 ao `schemaVersion`.
 
 O modelo persistido `MaintenancePlanItem.technicalSource` permanece como projeção de
-compatibilidade dos schemas 1–3. Ele pode carregar `claimIds`, mas não duplica documentos,
+compatibilidade dos schemas 1–4. Ele pode carregar `claimIds`, mas não duplica documentos,
 citações ou revisões. A fonte de verdade editorial é `NX200_TECHNICAL_CATALOG`.
 
 ## Política e validação do conteúdo
@@ -75,12 +76,16 @@ O valor em `garage_state` é diretamente o agregado, sem envelope adicional:
 
 ```typescript
 interface GarageState {
-  schemaVersion: 3;
+  schemaVersion: 4;
   motorcycle: Motorcycle;
   maintenancePlan: readonly MaintenancePlanItem[];
   serviceHistory: readonly ServiceRecord[];
   odometerHistory: readonly OdometerRecord[];
   procedureExecutions: readonly ProcedureExecution[];
+  fuelHistory: readonly FuelRecord[];
+  expenseHistory: readonly ExpenseRecord[];
+  occurrenceHistory: readonly OccurrenceRecord[];
+  safetyCheckHistory: readonly SafetyCheckRecord[];
   settings: GarageSettings;
   setup: GarageSetup;
 }
@@ -91,10 +96,10 @@ persiste apenas dados do usuário e referências a IDs estáveis do catálogo. A
 recusa IDs desconhecidos, duplicados, vínculos quebrados e mais de uma execução ativa do mesmo
 procedimento para a mesma motocicleta.
 
-A incorporação do manual não mudou essa estrutura: o schema permanece 3 e nenhuma migração vazia
-foi criada.
-Backups continuam contendo somente moto, plano, serviços, odômetro, execuções, preferências e
-setup. Documentos, claims, citações, revisões e procedimentos ficam fora do arquivo.
+O schema 4 foi criado para os dados cotidianos da Sprint 5. O checklist em si continua estático;
+o estado guarda somente respostas associadas a IDs estáveis. Backups contêm moto, plano,
+serviços, odômetro, execuções, abastecimentos, gastos, ocorrências, inspeções, preferências e
+setup. Documentos, claims, citações, revisões, procedimentos e descrições do checklist ficam fora.
 
 O seed do plano foi alinhado aos intervalos transcritos, mas continua `needs-confirmation`.
 Estados já persistidos não são reescritos silenciosamente enquanto essas claims não possuem
@@ -105,14 +110,16 @@ preservar execuções e personalizações do usuário.
 
 `decodeStoredGarageState` diferencia:
 
-- `empty`: usa o seed do schema 3;
-- `current`: aceita um schema 3 validado;
-- `migrated`: valida v2 e acrescenta somente `procedureExecutions: []`, ou percorre v1 → v2 → v3;
+- `empty`: usa o seed do schema 4;
+- `current`: aceita um schema 4 validado;
+- `migrated`: valida v3 e acrescenta coleções cotidianas vazias mais tema escuro; v2 acrescenta
+  antes `procedureExecutions: []`; v1 percorre v1 → v2 → v3 → v4;
 - `invalid-state`: preserva o valor bruto e usa o seed somente em memória;
 - `future-version`: preserva uma versão que o aplicativo atual não conhece.
 
-A transformação v2 → v3 preserva motocicleta, plano, serviços, odômetro, preferências e setup.
-Depois da primeira gravação, decodificar o resultado não aplica outra transformação. Estado
+A transformação v3 → v4 preserva todos os campos anteriores, acrescenta coleções vazias e inclui
+`settings.theme: 'dark'`. Depois da primeira gravação, decodificar o resultado não aplica outra
+transformação. Estado
 inválido ou futuro nunca é substituído automaticamente; somente importação ou restauração
 confirmada libera o modo de recuperação.
 
@@ -160,15 +167,15 @@ O envelope existe somente no arquivo:
 ```typescript
 interface GarageBackup {
   product: 'garage';
-  schemaVersion: 3;
+  schemaVersion: 4;
   exportedAt: string;
   state: GarageState;
 }
 ```
 
-O backup inclui execuções e vínculos, mas não o catálogo estático. A importação aceita schema 2,
-migra-o para 3, aceita schema 3 validado e recusa versões futuras. O resumo inclui quantidade de
-execuções. Selecionar o arquivo não muda o store; uma confirmação separada substitui os dados.
+O backup inclui todos os dados do usuário, mas não o catálogo estático. A importação aceita schemas
+2 e 3, migra-os até 4, aceita schema 4 validado e recusa versões futuras. O resumo inclui as novas
+coleções. Selecionar o arquivo não muda o store; uma confirmação separada substitui os dados.
 
 ## Catálogo e integridade
 
@@ -178,7 +185,8 @@ válidas. Campos para imagens futuras existem, mas nenhuma imagem mecânica foi 
 
 Slugs, etapas, alertas e verificações possuem uma lista protegida por teste para impedir que a
 reorganização do catálogo invalide execuções existentes. Procedimentos estão em versão editorial
-2 e estado `transcribed`; dados ausentes continuam `A confirmar`. A projeção persistida do plano
+3 e estado `transcribed`; a versão nova simplifica a linguagem e explicita limites de parada, sem
+aprovar transcrições. Dados ausentes continuam `A confirmar`. A projeção persistida do plano
 permanece `needs-confirmation`, pois ainda não existe revisão aprovada. Checklists de risco alto ou
 crítico recebem advertência reforçada, e a interface nunca afirma segurança ou aprovação
 mecânica. Conflito explícito bloqueia conclusão operacional.
@@ -210,6 +218,28 @@ odômetro atual. `shouldReplaceMaintenanceExecution` mantém a referência crono
 recente do plano. Itens `needs-confirmation` retornam `unknown` e não entram em alertas ou
 contagens. Notificações push continuam fora do escopo.
 
+## Uso cotidiano, consumo e custos
+
+`FuelRecord` guarda a leitura, litros, custo, data e indicação de tanque completo. A função pura
+`calculateFuelConsumption` ordena cronologicamente e calcula
+`(km atual - km anterior) / soma dos litros do intervalo` somente quando duas marcações de tanque
+completo formam uma sequência crescente. Abastecimentos parciais entram na soma desde a última
+marcação completa, mas permanecem no histórico sem fechar o intervalo; quilometragem histórica
+exige confirmação e nunca reduz a leitura atual.
+
+Custos exibidos somam combustível, valores informados em serviços e `ExpenseRecord`; não há
+projeção financeira. `OccurrenceRecord` registra uma percepção do usuário sem diagnosticar.
+`SafetyCheckRecord` persiste respostas aos IDs estáticos da inspeção da página 30 do manual. Um
+item problemático produz instrução de parada, e a conclusão nunca afirma que a moto está segura.
+
+## Tema e navegação
+
+Os tokens globais definem superfícies verde-grafite, contraste, destaque laranja, cores semânticas,
+elevação e durações. `settings.theme` aceita `dark`, `light` ou `system`; o shell aplica o atributo
+no elemento raiz e o CSS respeita `prefers-color-scheme` e `prefers-reduced-motion`. A navegação
+móvel usa cinco destinos e um bottom sheet de ações; no desktop, o shell oferece navegação lateral
+e mantém o conteúdo em largura controlada.
+
 ## PWA e hospedagem estática
 
 O Angular Service Worker é ativado em produção, guarda shell e assets, e sustenta a navegação
@@ -225,4 +255,4 @@ básica offline. O manifesto usa **Garage** e inicia em `/dashboard`. `npm run b
 - nenhuma claim confirmada para uso operacional;
 - temporizadores não persistem após fechar completamente o navegador;
 - Wake Lock depende de suporte e permissão do navegador;
-- sem imagens, anexos, exclusão de execuções, push, backend ou autenticação.
+- sem imagens mecânicas, anexos, exclusão de execuções, push, backend ou autenticação.

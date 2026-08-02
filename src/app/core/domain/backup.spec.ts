@@ -4,7 +4,7 @@ import { GarageState } from '../models/garage-state.model';
 import { createGarageBackup, parseGarageBackup } from './backup';
 
 const state: GarageState = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   motorcycle: {
     id: 'nx200-primary',
     manufacturer: 'Honda',
@@ -19,16 +19,20 @@ const state: GarageState = {
   serviceHistory: [],
   odometerHistory: [],
   procedureExecutions: [],
-  settings: { maintenanceAlertsEnabled: true },
+  fuelHistory: [],
+  expenseHistory: [],
+  occurrenceHistory: [],
+  safetyCheckHistory: [],
+  settings: { maintenanceAlertsEnabled: true, theme: 'dark' },
   setup: { completed: true, demoData: false },
 };
 
 describe('Garage backup', () => {
-  it('exports schema 3 with every user-owned collection', () => {
+  it('exports schema 4 with every user-owned collection', () => {
     const content = createGarageBackup(state, '2026-07-30T12:00:00.000Z');
     const parsed = JSON.parse(content) as Record<string, unknown>;
     expect(parsed['product']).toBe('garage');
-    expect(parsed['schemaVersion']).toBe(3);
+    expect(parsed['schemaVersion']).toBe(4);
     expect(parsed['exportedAt']).toBe('2026-07-30T12:00:00.000Z');
     expect(parsed['state']).toEqual(state);
     expect(content).not.toContain('NX200_PROCEDURES');
@@ -81,10 +85,11 @@ describe('Garage backup', () => {
       expect(result.summary.motorcycle).toBe('Honda NX200');
       expect(result.summary.currentMileage).toBe(18_500);
       expect(result.summary.procedureExecutions).toBe(0);
+      expect(result.summary.fuelRecords).toBe(0);
     }
   });
 
-  it('accepts a valid schema 2 backup and migrates it to schema 3', () => {
+  it('accepts a valid schema 2 backup and migrates it to schema 4', () => {
     const legacyState = { ...state, schemaVersion: 2 } as Record<string, unknown>;
     delete legacyState['procedureExecutions'];
     const result = parseGarageBackup(
@@ -98,8 +103,34 @@ describe('Garage backup', () => {
     );
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.backup.schemaVersion).toBe(3);
+      expect(result.backup.schemaVersion).toBe(4);
       expect(result.backup.state.procedureExecutions).toEqual([]);
+    }
+  });
+
+  it('accepts a schema 3 backup and adds the Sprint 5 collections', () => {
+    const legacyState: Record<string, unknown> = {
+      ...state,
+      schemaVersion: 3,
+      settings: { maintenanceAlertsEnabled: true },
+    };
+    delete legacyState['fuelHistory'];
+    delete legacyState['expenseHistory'];
+    delete legacyState['occurrenceHistory'];
+    delete legacyState['safetyCheckHistory'];
+    const result = parseGarageBackup(
+      JSON.stringify({
+        product: 'garage',
+        schemaVersion: 3,
+        exportedAt: '2026-08-02T12:00:00.000Z',
+        state: legacyState,
+      }),
+      NX200_PROCEDURES,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.backup.state.fuelHistory).toEqual([]);
+      expect(result.backup.state.settings.theme).toBe('dark');
     }
   });
 
@@ -124,7 +155,7 @@ describe('Garage backup', () => {
       parseGarageBackup(
         JSON.stringify({
           product: 'garage',
-          schemaVersion: 3,
+          schemaVersion: 4,
           exportedAt: '2026-07-30T12:00:00.000Z',
           state: { ...state, motorcycle: null },
         }),

@@ -28,12 +28,15 @@ interface PlanRow {
           <h1>Plano de manutenção</h1>
           <p>Prioridades calculadas pela quilometragem e pelo tempo.</p>
         </div>
-        <a
-          class="button button-primary"
-          [routerLink]="store.setup().completed ? '/maintenance/new' : '/motorcycle'"
-        >
-          {{ store.setup().completed ? '＋ Registrar serviço' : 'Configurar minha NX200' }}
-        </a>
+        <div class="header-actions">
+          <a class="button button-secondary" routerLink="/maintenance/upcoming">Ver próximas</a>
+          <a
+            class="button button-primary"
+            [routerLink]="store.setup().completed ? '/maintenance/new' : '/motorcycle'"
+          >
+            {{ store.setup().completed ? '＋ Registrar serviço' : 'Configurar minha NX200' }}
+          </a>
+        </div>
       </header>
 
       @if (!store.setup().completed) {

@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { calculateMaintenanceSchedule } from '../../core/domain/maintenance-calculator';
+import { summarizeFuelHistory } from '../../core/domain/fuel-consumption';
 import { calculateProcedureProgress } from '../../core/domain/procedure-execution';
 import { ProcedureExecution } from '../../core/models/procedure-execution.model';
 import { MaintenancePlanItem, MaintenanceSchedule } from '../../core/models/maintenance.model';
@@ -141,6 +142,19 @@ const urgency = { overdue: 5, due: 4, upcoming: 3, ok: 2, unknown: 1 } as const;
           </div>
         </form>
       }
+
+      <a class="card dashboard-consumption" routerLink="/fuel">
+        <div>
+          <span class="card-label">Consumo recente</span>
+          <strong>{{ consumptionLabel() }}</strong>
+          <small>{{
+            fuelSummary().latestKmPerLiter
+              ? 'último intervalo válido'
+              : 'registre dois tanques completos'
+          }}</small>
+        </div>
+        <span aria-hidden="true">›</span>
+      </a>
 
       <section class="metric-grid" aria-label="Resumo de manutenção">
         <article class="metric-card upcoming">
@@ -297,6 +311,14 @@ const urgency = { overdue: 5, due: 4, upcoming: 3, ok: 2, unknown: 1 } as const;
         <div class="quick-grid">
           <a
             class="quick-card primary"
+            [routerLink]="store.setup().completed ? '/fuel/new' : '/motorcycle'"
+          >
+            <span aria-hidden="true">⌁</span>
+            <strong>Registrar abastecimento</strong>
+            <small>Litros, custo e consumo</small>
+          </a>
+          <a
+            class="quick-card"
             [routerLink]="store.setup().completed ? '/maintenance/new' : '/motorcycle'"
           >
             <span aria-hidden="true">＋</span>
@@ -313,6 +335,11 @@ const urgency = { overdue: 5, due: 4, upcoming: 3, ok: 2, unknown: 1 } as const;
             <span aria-hidden="true">☷</span>
             <strong>Abrir procedimentos</strong>
             <small>Guias seguros, passo a passo</small>
+          </a>
+          <a class="quick-card" routerLink="/safety-check">
+            <span aria-hidden="true">✓</span>
+            <strong>Checklist pré-rodagem</strong>
+            <small>Uma inspeção rápida antes de sair</small>
           </a>
           <a class="quick-card" routerLink="/motorcycle">
             <span aria-hidden="true">⌁</span>
@@ -353,6 +380,7 @@ export class DashboardPage {
   protected readonly lastService = computed(() =>
     this.store.serviceHistory().find((service) => !service.isDemo),
   );
+  protected readonly fuelSummary = computed(() => summarizeFuelHistory(this.store.fuelHistory()));
   protected readonly recentProcedureExecutions = computed(() =>
     this.store.procedureExecutions().filter((execution) => execution.status !== 'in-progress'),
   );
@@ -477,5 +505,10 @@ export class DashboardPage {
       parts.push(this.formatDate(schedule.nextDate));
     }
     return parts.length > 0 ? parts.join(' ou ') : 'Dados pendentes de validação';
+  }
+
+  protected consumptionLabel(): string {
+    const value = this.fuelSummary().latestKmPerLiter;
+    return value === undefined ? '— km/L' : `${value.toFixed(1).replace('.', ',')} km/L`;
   }
 }

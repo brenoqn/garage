@@ -1,17 +1,25 @@
 import { GarageSettings, GarageSetup, GarageState } from '../models/garage-state.model';
+import { ExpenseRecord } from '../models/expense-record.model';
+import { FuelRecord } from '../models/fuel-record.model';
 import { MaintenancePlanItem } from '../models/maintenance.model';
 import { Motorcycle } from '../models/motorcycle.model';
 import { OdometerRecord } from '../models/odometer-record.model';
+import { OccurrenceRecord } from '../models/occurrence-record.model';
 import { Procedure } from '../models/procedure.model';
 import { ProcedureExecution } from '../models/procedure-execution.model';
 import { ServiceRecord } from '../models/service-record.model';
+import { SafetyCheckRecord } from '../models/safety-check.model';
+
+interface GarageSettingsV3 {
+  readonly maintenanceAlertsEnabled: boolean;
+}
 
 interface GarageStateV1 {
   readonly version: 1;
   readonly motorcycle: Motorcycle;
   readonly maintenancePlan: readonly MaintenancePlanItem[];
   readonly serviceHistory: readonly ServiceRecord[];
-  readonly settings: GarageSettings;
+  readonly settings: GarageSettingsV3;
 }
 
 export interface GarageStateV2 {
@@ -20,7 +28,18 @@ export interface GarageStateV2 {
   readonly maintenancePlan: readonly MaintenancePlanItem[];
   readonly serviceHistory: readonly ServiceRecord[];
   readonly odometerHistory: readonly OdometerRecord[];
-  readonly settings: GarageSettings;
+  readonly settings: GarageSettingsV3;
+  readonly setup: GarageSetup;
+}
+
+export interface GarageStateV3 {
+  readonly schemaVersion: 3;
+  readonly motorcycle: Motorcycle;
+  readonly maintenancePlan: readonly MaintenancePlanItem[];
+  readonly serviceHistory: readonly ServiceRecord[];
+  readonly odometerHistory: readonly OdometerRecord[];
+  readonly procedureExecutions: readonly ProcedureExecution[];
+  readonly settings: GarageSettingsV3;
   readonly setup: GarageSetup;
 }
 
@@ -30,6 +49,10 @@ export type GarageStateValidation =
 
 export type GarageStateV2Validation =
   | { readonly valid: true; readonly state: GarageStateV2 }
+  | { readonly valid: false; readonly error: string };
+
+export type GarageStateV3Validation =
+  | { readonly valid: true; readonly state: GarageStateV3 }
   | { readonly valid: false; readonly error: string };
 
 export type StoredGarageStateResult =
@@ -174,6 +197,7 @@ function isOdometerRecord(value: unknown): value is OdometerRecord {
     'dashboard',
     'motorcycle',
     'service',
+    'fuel',
     'correction',
     'panel-replacement',
     'migration',
@@ -187,7 +211,77 @@ function isOdometerRecord(value: unknown): value is OdometerRecord {
     typeof value['source'] === 'string' &&
     sources.includes(value['source']) &&
     isOptionalString(value['note']) &&
-    isOptionalString(value['serviceRecordId'])
+    isOptionalString(value['serviceRecordId']) &&
+    isOptionalString(value['fuelRecordId'])
+  );
+}
+
+function isFuelRecord(value: unknown): value is FuelRecord {
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value['id']) &&
+    isNonEmptyString(value['motorcycleId']) &&
+    isIsoTimestamp(value['fueledAt']) &&
+    isNonNegativeInteger(value['mileage']) &&
+    typeof value['liters'] === 'number' &&
+    Number.isFinite(value['liters']) &&
+    value['liters'] > 0 &&
+    isNonNegativeNumber(value['totalCost']) &&
+    typeof value['fullTank'] === 'boolean' &&
+    isOptionalString(value['station']) &&
+    isOptionalString(value['notes']) &&
+    isIsoTimestamp(value['createdAt'])
+  );
+}
+
+function isExpenseRecord(value: unknown): value is ExpenseRecord {
+  const categories = ['parts', 'document', 'parking', 'accessory', 'other'];
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value['id']) &&
+    isNonEmptyString(value['motorcycleId']) &&
+    isIsoDate(value['date']) &&
+    isNonEmptyString(value['title']) &&
+    typeof value['category'] === 'string' &&
+    categories.includes(value['category']) &&
+    isNonNegativeNumber(value['amount']) &&
+    isOptionalNonNegativeInteger(value['mileage']) &&
+    isOptionalString(value['notes']) &&
+    isIsoTimestamp(value['createdAt'])
+  );
+}
+
+function isOccurrenceRecord(value: unknown): value is OccurrenceRecord {
+  const severities = ['note', 'attention', 'stop'];
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value['id']) &&
+    isNonEmptyString(value['motorcycleId']) &&
+    isIsoTimestamp(value['occurredAt']) &&
+    isNonNegativeInteger(value['mileage']) &&
+    isNonEmptyString(value['title']) &&
+    typeof value['severity'] === 'string' &&
+    severities.includes(value['severity']) &&
+    isOptionalString(value['notes']) &&
+    isIsoTimestamp(value['createdAt'])
+  );
+}
+
+function isSafetyCheckRecord(value: unknown): value is SafetyCheckRecord {
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value['id']) &&
+    isNonEmptyString(value['motorcycleId']) &&
+    isIsoTimestamp(value['checkedAt']) &&
+    Array.isArray(value['responses']) &&
+    value['responses'].every(
+      (response) =>
+        isRecord(response) &&
+        isNonEmptyString(response['itemId']) &&
+        (response['status'] === 'ok' || response['status'] === 'issue'),
+    ) &&
+    isOptionalString(value['notes']) &&
+    isIsoTimestamp(value['createdAt'])
   );
 }
 
@@ -234,8 +328,18 @@ function isProcedureExecution(value: unknown): value is ProcedureExecution {
   return value['completedAt'] === undefined && value['cancelledAt'] === undefined;
 }
 
-function isSettings(value: unknown): value is GarageSettings {
+function isSettingsV3(value: unknown): value is GarageSettingsV3 {
   return isRecord(value) && typeof value['maintenanceAlertsEnabled'] === 'boolean';
+}
+
+function isSettings(value: unknown): value is GarageSettings {
+  const candidate = value as UnknownRecord;
+  return (
+    isSettingsV3(value) &&
+    (candidate['theme'] === 'dark' ||
+      candidate['theme'] === 'light' ||
+      candidate['theme'] === 'system')
+  );
 }
 
 function isSetup(value: unknown): value is GarageSetup {
@@ -254,7 +358,11 @@ function hasUniqueStrings(values: readonly string[]): boolean {
   return new Set(values).size === values.length;
 }
 
-function validateBaseFields(value: UnknownRecord, includeV2Fields: boolean): string | null {
+function validateBaseFields(
+  value: UnknownRecord,
+  includeV2Fields: boolean,
+  includeTheme: boolean,
+): string | null {
   if (!isMotorcycle(value['motorcycle'])) return 'Os dados da motocicleta são inválidos.';
   if (
     !Array.isArray(value['maintenancePlan']) ||
@@ -265,7 +373,9 @@ function validateBaseFields(value: UnknownRecord, includeV2Fields: boolean): str
   if (!Array.isArray(value['serviceHistory']) || !value['serviceHistory'].every(isServiceRecord)) {
     return 'O histórico de serviços é inválido.';
   }
-  if (!isSettings(value['settings'])) return 'As configurações são inválidas.';
+  if (!(includeTheme ? isSettings(value['settings']) : isSettingsV3(value['settings']))) {
+    return 'As configurações são inválidas.';
+  }
 
   const maintenancePlan = value['maintenancePlan'] as readonly MaintenancePlanItem[];
   const serviceHistory = value['serviceHistory'] as readonly ServiceRecord[];
@@ -426,12 +536,66 @@ function validateExecutionReferences(
   return null;
 }
 
+function validateDailyUseCollections(value: UnknownRecord): string | null {
+  if (!Array.isArray(value['fuelHistory']) || !value['fuelHistory'].every(isFuelRecord)) {
+    return 'O histórico de abastecimentos é inválido.';
+  }
+  if (!Array.isArray(value['expenseHistory']) || !value['expenseHistory'].every(isExpenseRecord)) {
+    return 'O histórico de gastos é inválido.';
+  }
+  if (
+    !Array.isArray(value['occurrenceHistory']) ||
+    !value['occurrenceHistory'].every(isOccurrenceRecord)
+  ) {
+    return 'O histórico de ocorrências é inválido.';
+  }
+  if (
+    !Array.isArray(value['safetyCheckHistory']) ||
+    !value['safetyCheckHistory'].every(isSafetyCheckRecord)
+  ) {
+    return 'O histórico de inspeções pré-rodagem é inválido.';
+  }
+
+  const motorcycle = value['motorcycle'] as Motorcycle;
+  const fuelHistory = value['fuelHistory'] as readonly FuelRecord[];
+  const expenseHistory = value['expenseHistory'] as readonly ExpenseRecord[];
+  const occurrenceHistory = value['occurrenceHistory'] as readonly OccurrenceRecord[];
+  const safetyCheckHistory = value['safetyCheckHistory'] as readonly SafetyCheckRecord[];
+  const collections = [fuelHistory, expenseHistory, occurrenceHistory, safetyCheckHistory];
+  if (collections.some((records) => !hasUniqueIds(records))) {
+    return 'Um histórico de uso cotidiano contém identificadores duplicados.';
+  }
+  if (
+    [...fuelHistory, ...expenseHistory, ...occurrenceHistory, ...safetyCheckHistory].some(
+      (record) => record.motorcycleId !== motorcycle.id,
+    )
+  ) {
+    return 'Um registro de uso cotidiano aponta para outra motocicleta.';
+  }
+  if (
+    safetyCheckHistory.some(
+      (record) =>
+        !hasUniqueStrings(record.responses.map((response) => response.itemId)) ||
+        record.responses.length === 0,
+    )
+  ) {
+    return 'Uma inspeção pré-rodagem contém respostas inválidas.';
+  }
+
+  const fuelIds = new Set(fuelHistory.map((record) => record.id));
+  const odometerHistory = value['odometerHistory'] as readonly OdometerRecord[];
+  if (odometerHistory.some((record) => record.fuelRecordId && !fuelIds.has(record.fuelRecordId))) {
+    return 'Uma leitura do odômetro aponta para um abastecimento inexistente.';
+  }
+  return null;
+}
+
 export function validateGarageStateV2(value: unknown): GarageStateV2Validation {
   if (!isRecord(value) || value['schemaVersion'] !== 2) {
     return { valid: false, error: 'O estado não usa o schema 2 do Garage.' };
   }
   const error =
-    validateBaseFields(value, true) ??
+    validateBaseFields(value, true, false) ??
     ((value['serviceHistory'] as readonly ServiceRecord[]).some(
       (record) => record.procedureExecutionId !== undefined,
     )
@@ -446,15 +610,34 @@ export function validateGarageState(
   value: unknown,
   procedures: readonly Procedure[] = [],
 ): GarageStateValidation {
-  if (!isRecord(value) || value['schemaVersion'] !== 3) {
-    return { valid: false, error: 'O estado não usa o schema 3 do Garage.' };
+  if (!isRecord(value) || value['schemaVersion'] !== 4) {
+    return { valid: false, error: 'O estado não usa o schema 4 do Garage.' };
   }
-  const error = validateBaseFields(value, true) ?? validateExecutionReferences(value, procedures);
+  const error =
+    validateBaseFields(value, true, true) ??
+    validateExecutionReferences(value, procedures) ??
+    validateDailyUseCollections(value);
   return error ? { valid: false, error } : { valid: true, state: value as unknown as GarageState };
 }
 
+export function validateGarageStateV3(
+  value: unknown,
+  procedures: readonly Procedure[] = [],
+): GarageStateV3Validation {
+  if (!isRecord(value) || value['schemaVersion'] !== 3) {
+    return { valid: false, error: 'O estado não usa o schema 3 do Garage.' };
+  }
+  const error =
+    validateBaseFields(value, true, false) ?? validateExecutionReferences(value, procedures);
+  return error
+    ? { valid: false, error }
+    : { valid: true, state: value as unknown as GarageStateV3 };
+}
+
 function isGarageStateV1(value: unknown): value is GarageStateV1 {
-  return isRecord(value) && value['version'] === 1 && validateBaseFields(value, false) === null;
+  return (
+    isRecord(value) && value['version'] === 1 && validateBaseFields(value, false, false) === null
+  );
 }
 
 function migrateGarageStateV1ToV2(value: GarageStateV1): GarageStateV2 {
@@ -479,12 +662,24 @@ function migrateGarageStateV1ToV2(value: GarageStateV1): GarageStateV2 {
   };
 }
 
-export function migrateGarageStateV2(value: GarageStateV2): GarageState {
+export function migrateGarageStateV2(value: GarageStateV2): GarageStateV3 {
   return { ...value, schemaVersion: 3, procedureExecutions: [] };
 }
 
+export function migrateGarageStateV3(value: GarageStateV3): GarageState {
+  return {
+    ...value,
+    schemaVersion: 4,
+    fuelHistory: [],
+    expenseHistory: [],
+    occurrenceHistory: [],
+    safetyCheckHistory: [],
+    settings: { ...value.settings, theme: 'dark' },
+  };
+}
+
 export function migrateGarageStateV1(value: GarageStateV1): GarageState {
-  return migrateGarageStateV2(migrateGarageStateV1ToV2(value));
+  return migrateGarageStateV3(migrateGarageStateV2(migrateGarageStateV1ToV2(value)));
 }
 
 export function decodeStoredGarageState(
@@ -506,7 +701,7 @@ export function decodeStoredGarageState(
   }
 
   if (isRecord(parsed) && typeof parsed['schemaVersion'] === 'number') {
-    if (parsed['schemaVersion'] > 3) {
+    if (parsed['schemaVersion'] > 4) {
       return {
         kind: 'future-version',
         state: safeState,
@@ -518,7 +713,21 @@ export function decodeStoredGarageState(
     if (parsed['schemaVersion'] === 2) {
       const validation = validateGarageStateV2(parsed);
       return validation.valid
-        ? { kind: 'migrated', state: migrateGarageStateV2(validation.state) }
+        ? {
+            kind: 'migrated',
+            state: migrateGarageStateV3(migrateGarageStateV2(validation.state)),
+          }
+        : {
+            kind: 'invalid-state',
+            state: safeState,
+            rawValue,
+            message: `${validation.error} O conteúdo original foi preservado.`,
+          };
+    }
+    if (parsed['schemaVersion'] === 3) {
+      const validation = validateGarageStateV3(parsed, procedures);
+      return validation.valid
+        ? { kind: 'migrated', state: migrateGarageStateV3(validation.state) }
         : {
             kind: 'invalid-state',
             state: safeState,

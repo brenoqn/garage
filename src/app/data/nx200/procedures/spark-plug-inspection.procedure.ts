@@ -11,11 +11,11 @@ export const SPARK_PLUG_INSPECTION_PROCEDURE: Procedure = {
   title: 'Inspeção da vela',
   category: 'Motor',
   description:
-    'Remoção, inspeção visual, medição da folga e reinstalação básica conforme o manual aplicável.',
+    'Guia para retirar a vela com o motor frio, observar seu estado e recolocá-la sem forçar a rosca.',
   difficulty: 'moderate',
   ...transcribedEditorialMetadata(
     'moderate',
-    'Rosca, aperto ou componente incorreto podem danificar o cabeçote ou afetar o funcionamento.',
+    'Pare se a vela não sair ou entrar suavemente, se a rosca parecer danificada ou se o modelo for incerto.',
   ),
   estimatedMinutes: 30,
   tools: [
@@ -52,7 +52,8 @@ export const SPARK_PLUG_INSPECTION_PROCEDURE: Procedure = {
     {
       id: 'spark-step-gap',
       title: 'Confirme a folga',
-      description: 'Meça com calibrador; o manual transcreve folga de 0,8–0,9 mm.',
+      description:
+        'Meça com o calibrador e consulte o valor na referência técnica, ainda pendente de revisão.',
       required: true,
     },
     {

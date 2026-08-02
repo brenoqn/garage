@@ -1,8 +1,13 @@
 # Garage
 
-Garage é um aplicativo web progressivo, mobile-first e autodidático para proprietários de
-motocicletas. Este MVP atende exclusivamente à Honda NX200 e oferece manutenção preventiva,
-procedimentos interativos, histórico de serviços, histórico do odômetro e alertas internos.
+Garage é um aplicativo pessoal para proprietários de motocicletas que desejam realizar e
+acompanhar manutenções básicas em casa. Este MVP atende exclusivamente à Honda NX200 e reúne
+manutenção preventiva, procedimentos interativos, odômetro, abastecimentos, consumo, custos e
+histórico local.
+
+O Garage não substitui mecânicos nem oferece reparos profissionais. Os guias são voltados ao
+proprietário hobbista, com linguagem direta, ferramentas acessíveis, alertas claros e indicação
+explícita de quando parar e procurar um profissional.
 
 O nome do produto é **Garage**. “Honda NX200” identifica somente a primeira motocicleta
 suportada.
@@ -17,6 +22,12 @@ suportada.
 - plano preventivo com os estados `ok`, `upcoming`, `due`, `overdue` e `unknown`;
 - intervalos sem fonte confirmada visíveis, porém inativos nas contagens e nos alertas;
 - registro cronológico de serviços, peças, custos e observações;
+- abastecimentos com custo, litros, tanque completo e cálculo auditável de km/L;
+- bloqueio de consumo para sequências inválidas e confirmação para abastecimento histórico;
+- histórico unificado de serviços, abastecimentos, gastos, ocorrências e inspeções;
+- gastos básicos agregando combustível, manutenção e registros avulsos;
+- checklist pré-rodagem persistido, com dez itens localizados na página 30 do manual aplicável;
+- tela dedicada de próximas manutenções, sem ativar intervalos ainda não revisados;
 - atualização da referência do plano somente quando o serviço vinculado é mais recente;
 - biblioteca pesquisável com seis procedimentos básicos transcritos e IDs estáveis;
 - preparação com confirmação de segurança, execução passo a passo e retomada local;
@@ -29,7 +40,9 @@ suportada.
 - transparência em `/technical-sources`, filtros por sistema, estado e aplicabilidade;
 - versionamento editorial e risco separados da dificuldade dos procedimentos;
 - detecção automática de conflitos e validação bloqueante do conteúdo;
-- estado local no schema 3, migração encadeada dos formatos anteriores e recuperação segura;
+- tema escuro padrão, opções claro e sistema, tokens CSS e preferência persistida;
+- navegação móvel priorizando Início, Manutenção, Fazer, Abastecer e Histórico;
+- estado local no schema 4, migração encadeada dos formatos anteriores e recuperação segura;
 - exportação e importação de backup JSON com validação, resumo e confirmação;
 - navegação responsiva, PWA instalável e service worker de produção;
 - testes de domínio, store, migração, backup, procedimentos, componentes e Wake Lock.
@@ -65,10 +78,11 @@ npm run build:sites
 
 ## Persistência, migração e backup
 
-O `LocalStorage` guarda diretamente um `GarageState` com `schemaVersion: 3` na chave física
-`garage_state`. Estados do schema 2 recebem `procedureExecutions: []` sem mudança nos demais
-campos. O formato `version: 1` percorre a cadeia v1 → v2 → v3. Cada etapa é validada, a
-migração é idempotente e o conteúdo anterior é preservado.
+O `LocalStorage` guarda diretamente um `GarageState` com `schemaVersion: 4` na chave física
+`garage_state`. O schema 4 acrescenta abastecimentos, gastos, ocorrências, inspeções pré-rodagem
+e preferência de tema. Estados do schema 3 recebem coleções vazias e tema escuro; o schema 2
+recebe antes `procedureExecutions: []`. O formato `version: 1` percorre toda a cadeia
+v1 → v2 → v3 → v4. Cada etapa é validada, idempotente e preserva o conteúdo anterior.
 
 Se o valor local for inválido ou pertencer a uma versão futura, ele não é sobrescrito. O
 Garage inicia um estado demonstrativo somente em memória, informa o problema e permite
@@ -80,16 +94,16 @@ O backup usa um envelope separado:
 ```json
 {
   "product": "garage",
-  "schemaVersion": 3,
-  "exportedAt": "2026-07-30T12:00:00.000Z",
+  "schemaVersion": 4,
+  "exportedAt": "2026-08-02T12:00:00.000Z",
   "state": {}
 }
 ```
 
-Procedimentos e especificações são conteúdo estático e não entram no backup. Execuções de
-procedimentos, seus vínculos com serviços, plano, odômetro e demais dados do usuário entram.
-Backups do schema 2 são aceitos e migrados; schema 3 é validado diretamente; versões futuras
-são recusadas. Serviços demonstrativos reconstruíveis e suas referências são removidos.
+Procedimentos, itens estáticos do checklist e especificações não entram no backup. Execuções,
+serviços, plano, odômetro, abastecimentos, gastos, ocorrências, inspeções e preferências entram.
+Backups dos schemas 2 e 3 são aceitos e migrados; schema 4 é validado diretamente; versões
+futuras são recusadas. Serviços demonstrativos reconstruíveis e suas referências são removidos.
 
 O aplicativo não possui backend, conta de usuário, sincronização ou notificações push nesta
 etapa. O backup é a forma disponível de transferir dados entre navegadores ou dispositivos.

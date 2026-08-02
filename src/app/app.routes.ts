@@ -37,6 +37,14 @@ export const routes: Routes = [
           import('./features/maintenance/history-page').then((component) => component.HistoryPage),
       },
       {
+        path: 'maintenance/upcoming',
+        title: 'Próximas manutenções | Garage',
+        loadComponent: () =>
+          import('./features/maintenance/upcoming-maintenance-page').then(
+            (component) => component.UpcomingMaintenancePage,
+          ),
+      },
+      {
         path: 'maintenance/new',
         title: 'Registrar manutenção | Garage',
         loadComponent: () =>
@@ -50,6 +58,48 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/procedures/procedures-page').then(
             (component) => component.ProceduresPage,
+          ),
+      },
+      {
+        path: 'fuel',
+        title: 'Abastecimentos | Garage',
+        loadComponent: () =>
+          import('./features/fuel/fuel-page').then((component) => component.FuelPage),
+      },
+      {
+        path: 'fuel/new',
+        title: 'Registrar abastecimento | Garage',
+        loadComponent: () =>
+          import('./features/fuel/new-fuel-page').then((component) => component.NewFuelPage),
+      },
+      {
+        path: 'expenses',
+        title: 'Gastos da motocicleta | Garage',
+        loadComponent: () =>
+          import('./features/expenses/expenses-page').then((component) => component.ExpensesPage),
+      },
+      {
+        path: 'occurrences/new',
+        title: 'Registrar ocorrência | Garage',
+        loadComponent: () =>
+          import('./features/occurrences/new-occurrence-page').then(
+            (component) => component.NewOccurrencePage,
+          ),
+      },
+      {
+        path: 'safety-check',
+        title: 'Checklist de segurança | Garage',
+        loadComponent: () =>
+          import('./features/safety/safety-check-page').then(
+            (component) => component.SafetyCheckPage,
+          ),
+      },
+      {
+        path: 'history',
+        title: 'Histórico | Garage',
+        loadComponent: () =>
+          import('./features/history/activity-history-page').then(
+            (component) => component.ActivityHistoryPage,
           ),
       },
       {

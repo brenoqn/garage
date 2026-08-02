@@ -112,6 +112,11 @@ linguagem de inspeção e nunca “moto segura”, “freio aprovado” ou equiv
 
 ## Linguagem, imagens e marcas
 
+Escreva para o proprietário hobbista, não para um técnico de oficina. Prefira frases curtas,
+verbos diretos, uma ação por etapa e nomes de ferramentas acessíveis. Explique o objetivo somente
+quando isso ajudar a executar ou decidir. Diante de risco, anormalidade ou informação insuficiente,
+use uma instrução de parada explícita e indique avaliação profissional.
+
 - escreva em português do Brasil, com frases diretas;
 - diferencie inspeção, ajuste, substituição e confirmação;
 - não transforme observação visual em diagnóstico definitivo;

@@ -21,10 +21,10 @@ export function transcribedEditorialMetadata(
     primarySourceIds: [NX200_OWNER_MANUAL_SOURCE_ID, 'nx200-service-manual-pending'],
     applicability: NX200_1997_APPLICABILITY,
     editorialRevision: {
-      version: 2,
+      version: 3,
       revisedAt: '2026-08-02',
       summary:
-        'Procedimento básico alinhado ao manual do proprietário aplicável; revisão técnica da transcrição pendente.',
+        'Linguagem simplificada para o proprietário hobbista, com limites de parada explícitos; revisão técnica da transcrição pendente.',
       status: 'transcribed',
     },
   };

@@ -10,12 +10,11 @@ export const CHAIN_MAINTENANCE_PROCEDURE: Procedure = {
   slug: 'ajuste-lubrificacao-corrente',
   title: 'Ajuste e lubrificação da corrente',
   category: 'Transmissão',
-  description:
-    'Inspeção da transmissão final, limpeza cuidadosa, lubrificação e conferência do alinhamento.',
+  description: 'Guia para observar, limpar e lubrificar a corrente sem ligar o motor.',
   difficulty: 'moderate',
   ...transcribedEditorialMetadata(
     'high',
-    'Ajuste ou alinhamento incorreto pode afetar a transmissão e o controle da motocicleta.',
+    'Pare se houver elo preso, dente danificado, ajuste desigual ou dúvida sobre o alinhamento. Procure um profissional.',
   ),
   estimatedMinutes: 40,
   tools: [
@@ -55,14 +54,14 @@ export const CHAIN_MAINTENANCE_PROCEDURE: Procedure = {
       id: 'chain-step-measure',
       title: 'Meça a folga',
       description:
-        'Meça na região central inferior e verifique vários pontos; o manual transcreve 35–45 mm.',
+        'Meça no meio da parte inferior e repita em outros pontos. Consulte a referência técnica antes de usar qualquer valor.',
       required: true,
     },
     {
       id: 'chain-step-align',
       title: 'Ajuste e alinhe',
       description:
-        'Faça o mesmo número de voltas nos dois lados, alinhe as marcas e confira novamente a folga e o freio traseiro.',
+        'Se você souber fazer o ajuste com segurança, mova os dois lados por igual e confira novamente. Se não, pare após a inspeção.',
       required: true,
     },
     {

@@ -3,6 +3,7 @@ export type OdometerRecordSource =
   | 'dashboard'
   | 'motorcycle'
   | 'service'
+  | 'fuel'
   | 'correction'
   | 'panel-replacement'
   | 'migration';
@@ -15,6 +16,7 @@ export interface OdometerRecord {
   readonly source: OdometerRecordSource;
   readonly note?: string;
   readonly serviceRecordId?: string;
+  readonly fuelRecordId?: string;
 }
 
 export interface OdometerUpdateRequest {

@@ -55,7 +55,7 @@ describe('GarageStore', () => {
     );
   });
 
-  it('records each odometer update and persists schema 3', () => {
+  it('records each odometer update and persists schema 4', () => {
     const result = store.updateMileage({
       mileage: 31_000,
       source: 'dashboard',
@@ -69,7 +69,7 @@ describe('GarageStore', () => {
       source: 'dashboard',
       note: 'Leitura no abastecimento',
     });
-    expect(storage.get<GarageState>('state')?.schemaVersion).toBe(3);
+    expect(storage.get<GarageState>('state')?.schemaVersion).toBe(4);
   });
 
   it('does not lower mileage until the regression is explicitly confirmed', () => {
@@ -199,9 +199,9 @@ describe('GarageStore', () => {
 
     const migratedStore = TestBed.inject(GarageStore);
     const persisted = legacyStorage.get<Record<string, unknown>>('state');
-    expect(migratedStore.state().schemaVersion).toBe(3);
+    expect(migratedStore.state().schemaVersion).toBe(4);
     expect(migratedStore.motorcycle()).toEqual(INITIAL_GARAGE_STATE.motorcycle);
-    expect(persisted?.['schemaVersion']).toBe(3);
+    expect(persisted?.['schemaVersion']).toBe(4);
     expect(persisted?.['version']).toBeUndefined();
   });
 
@@ -216,7 +216,7 @@ describe('GarageStore', () => {
 
     expect(recoveredStore.importState(INITIAL_GARAGE_STATE)).toBe(true);
     expect(recoveredStore.recovery()).toBeUndefined();
-    expect(invalidStorage.get<GarageState>('state')?.schemaVersion).toBe(3);
+    expect(invalidStorage.get<GarageState>('state')?.schemaVersion).toBe(4);
   });
 
   it('persists procedure progress and resumes it after recreating the store', () => {
@@ -307,5 +307,54 @@ describe('GarageStore', () => {
     expect(store.motorcycle().currentMileage).toBe(before.motorcycle.currentMileage);
     expect(store.maintenancePlan()).toEqual(before.maintenancePlan);
     expect(store.serviceHistory()).toEqual(before.serviceHistory);
+  });
+
+  it('records fuel, updates a higher odometer and keeps the durable link', () => {
+    const fuel = store.addFuel({
+      fueledAt: '2026-08-02T10:00:00.000Z',
+      mileage: 29_000,
+      liters: 8.5,
+      totalCost: 52,
+      fullTank: true,
+    });
+    expect(fuel).not.toBeNull();
+    expect(store.motorcycle().currentMileage).toBe(29_000);
+    expect(store.odometerHistory()[0]).toMatchObject({
+      source: 'fuel',
+      fuelRecordId: fuel?.id,
+      mileage: 29_000,
+    });
+  });
+
+  it('requires confirmation for historical fuel and never lowers the current odometer', () => {
+    const input = {
+      fueledAt: '2026-07-01T10:00:00.000Z',
+      mileage: 20_000,
+      liters: 8,
+      totalCost: 48,
+      fullTank: true,
+    };
+    expect(store.addFuel(input)).toBeNull();
+    expect(store.addFuel({ ...input, confirmedHistoricalMileage: true })).not.toBeNull();
+    expect(store.motorcycle().currentMileage).toBe(28_750);
+  });
+
+  it('stores a complete pre-ride check and rolls back on write failure', () => {
+    const responses = store.safetyChecklist().map((item) => ({
+      itemId: item.id,
+      status: 'ok' as const,
+    }));
+    const saved = store.addSafetyCheck({
+      checkedAt: '2026-08-02T10:00:00.000Z',
+      responses,
+    });
+    expect(saved.ok).toBe(true);
+    expect(store.safetyCheckHistory()).toHaveLength(1);
+
+    storage.failWrites = true;
+    expect(store.addSafetyCheck({ checkedAt: '2026-08-02T11:00:00.000Z', responses }).ok).toBe(
+      false,
+    );
+    expect(store.safetyCheckHistory()).toHaveLength(1);
   });
 });

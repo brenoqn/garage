@@ -286,6 +286,7 @@ export class MotorcyclePage {
       dashboard: 'Atualização rápida',
       motorcycle: 'Dados da motocicleta',
       service: 'Registro de manutenção',
+      fuel: 'Abastecimento',
       correction: 'Correção confirmada',
       'panel-replacement': 'Troca do painel',
       migration: 'Migração do estado anterior',

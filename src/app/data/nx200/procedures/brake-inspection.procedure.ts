@@ -11,11 +11,11 @@ export const BRAKE_INSPECTION_PROCEDURE: Procedure = {
   title: 'Inspeção dos freios',
   category: 'Freios',
   description:
-    'Verificação visual e funcional dos comandos, fluido, vazamentos e indicadores de desgaste.',
+    'Inspeção visual dos comandos, vazamentos e sinais de desgaste. Não inclui reparo ou sangria.',
   difficulty: 'advanced',
   ...transcribedEditorialMetadata(
     'critical',
-    'Falhas ou interpretação incorreta podem comprometer diretamente a frenagem. O checklist não certifica segurança.',
+    'Pare diante de vazamento, comando estranho, desgaste ou dúvida. Não rode até um profissional avaliar os freios.',
   ),
   estimatedMinutes: 35,
   tools: [
@@ -42,7 +42,7 @@ export const BRAKE_INSPECTION_PROCEDURE: Procedure = {
       id: 'brake-step-controls',
       title: 'Teste os comandos',
       description:
-        'Observe o freio dianteiro hidráulico e a folga do pedal traseiro, transcrita como 20–30 mm.',
+        'Acione os dois comandos e observe se o movimento parece normal. Consulte a referência técnica antes de ajustar.',
       required: true,
     },
     {

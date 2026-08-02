@@ -60,9 +60,27 @@
 - [x] procedimentos básicos e seed do plano alinhados ao conteúdo coberto pelo manual;
 - [x] manual de serviço mantido como requisito para torques, tolerâncias e reparos avançados.
 
+## Sprint 5 — uso cotidiano da NX200
+
+- [x] schema 4 e migração idempotente v3 → v4, preservando a cadeia anterior;
+- [x] abastecimentos locais com litros, custo, tanque completo e histórico do odômetro;
+- [x] consumo por intervalo válido, média ponderada e exclusão de sequências regressivas;
+- [x] confirmação explícita para abastecimento histórico sem reduzir o odômetro atual;
+- [x] tela dedicada de próximas manutenções e cronograma honesto para conteúdo pendente;
+- [x] procedimentos em linguagem simplificada, com limites de parada explícitos e IDs preservados;
+- [x] registro opcional e pré-preenchido após concluir um procedimento;
+- [x] checklist pré-rodagem persistido, citado e sem alegação de certificação mecânica;
+- [x] gastos básicos de combustível, serviços e lançamentos avulsos;
+- [x] ocorrências rápidas e histórico cotidiano unificado;
+- [x] tema escuro padrão, opções claro/sistema e preferência persistida;
+- [x] navegação mobile-first com ação central e bottom sheet;
+- [x] layout adaptativo, tokens visuais e suporte a movimento reduzido;
+- [x] backup schema 4 e importação compatível com schemas 2 e 3;
+- [x] testes de consumo, migração, abastecimento histórico, checklist, store e componentes.
+
 ## Próximas iterações
 
-### Sprint 5 recomendada — revisão das primeiras transcrições
+### Sprint 6 recomendada — revisão das primeiras transcrições
 
 - revisar tecnicamente as transcrições de bateria ou vela como primeiro domínio de menor risco;
 - obter legalmente manual de serviço e catálogo de peças aplicáveis;
@@ -76,7 +94,7 @@
 
 - editor de intervalos do plano com trilha da fonte;
 - tratamento de instalação e atualização da PWA;
-- modo escuro e preferências de acessibilidade;
+- auditoria automatizada de contraste e smoke test E2E em breakpoints adicionais;
 - importação de backups legados adicionais somente com migração explícita.
 
 ### Plataforma

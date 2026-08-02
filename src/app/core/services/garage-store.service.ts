@@ -6,7 +6,9 @@ import {
   NX200_TECHNICAL_CLAIMS,
   NX200_TECHNICAL_SOURCES,
 } from '../../data/nx200-demo.data';
+import { NX200_PRE_RIDE_CHECKLIST } from '../../data/nx200/safety/nx200-pre-ride-checklist.data';
 import { createGarageBackup } from '../domain/backup';
+import { validateNewFuelRecord } from '../domain/fuel-consumption';
 import { decodeStoredGarageState, validateGarageState } from '../domain/garage-state-migration';
 import { evaluateOdometerUpdate } from '../domain/odometer-policy';
 import {
@@ -27,15 +29,20 @@ import {
   uncompleteProcedureStep,
 } from '../domain/procedure-execution';
 import { shouldReplaceMaintenanceExecution } from '../domain/service-chronology';
-import { GarageState, GarageStateRecovery } from '../models/garage-state.model';
+import { buildSafetyCheckRecord, SafetyCheckResult } from '../domain/safety-check';
+import { ExpenseRecord, NewExpenseRecord } from '../models/expense-record.model';
+import { FuelRecord, NewFuelRecord } from '../models/fuel-record.model';
+import { GarageState, GarageStateRecovery, GarageTheme } from '../models/garage-state.model';
 import { Motorcycle } from '../models/motorcycle.model';
 import {
   OdometerRecord,
   OdometerUpdateRequest,
   OdometerUpdateResult,
 } from '../models/odometer-record.model';
-import { NewServiceRecord, ServiceRecord } from '../models/service-record.model';
+import { NewOccurrenceRecord, OccurrenceRecord } from '../models/occurrence-record.model';
 import { ProcedureExecution } from '../models/procedure-execution.model';
+import { NewSafetyCheckRecord } from '../models/safety-check.model';
+import { NewServiceRecord, ServiceRecord } from '../models/service-record.model';
 import { LocalStorageAdapter } from '../storage/local-storage.adapter';
 import { StoragePort } from '../storage/storage.port';
 
@@ -76,6 +83,24 @@ export class GarageStore {
       b.updatedAt.localeCompare(a.updatedAt),
     ),
   );
+  readonly fuelHistory = computed(() =>
+    [...this.stateSignal().fuelHistory].sort((a, b) => b.fueledAt.localeCompare(a.fueledAt)),
+  );
+  readonly expenseHistory = computed(() =>
+    [...this.stateSignal().expenseHistory].sort(
+      (a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt),
+    ),
+  );
+  readonly occurrenceHistory = computed(() =>
+    [...this.stateSignal().occurrenceHistory].sort((a, b) =>
+      b.occurredAt.localeCompare(a.occurredAt),
+    ),
+  );
+  readonly safetyCheckHistory = computed(() =>
+    [...this.stateSignal().safetyCheckHistory].sort((a, b) =>
+      b.checkedAt.localeCompare(a.checkedAt),
+    ),
+  );
   readonly activeProcedureExecutions = computed(() =>
     this.procedureExecutions().filter((execution) => execution.status === 'in-progress'),
   );
@@ -86,6 +111,7 @@ export class GarageStore {
   readonly specifications = signal(NX200_SPECIFICATIONS).asReadonly();
   readonly technicalClaims = signal(NX200_TECHNICAL_CLAIMS).asReadonly();
   readonly technicalSources = signal(NX200_TECHNICAL_SOURCES).asReadonly();
+  readonly safetyChecklist = signal(NX200_PRE_RIDE_CHECKLIST).asReadonly();
 
   startProcedure(
     procedureSlug: string,
@@ -326,6 +352,12 @@ export class GarageStore {
       confirmedRegression: true,
     };
     const record = this.createOdometerRecord(request, recordedAt);
+    const demoServiceIds = new Set(
+      this.stateSignal()
+        .serviceHistory.filter((service) => service.isDemo)
+        .map((service) => service.id),
+    );
+    const clearDemonstrationExecutions = this.setup().demoData && demoServiceIds.size > 0;
     return this.persist({
       ...this.stateSignal(),
       motorcycle: {
@@ -333,7 +365,20 @@ export class GarageStore {
         ...changes,
         updatedAt: recordedAt,
       },
-      odometerHistory: [record, ...this.stateSignal().odometerHistory],
+      maintenancePlan: this.stateSignal().maintenancePlan.map((item) =>
+        item.lastExecution &&
+        (demoServiceIds.has(item.lastExecution.serviceRecordId ?? '') ||
+          (clearDemonstrationExecutions && !item.lastExecution.serviceRecordId))
+          ? this.withoutMaintenanceExecution(item)
+          : item,
+      ),
+      serviceHistory: this.stateSignal().serviceHistory.filter((service) => !service.isDemo),
+      odometerHistory: [
+        record,
+        ...this.stateSignal().odometerHistory.filter(
+          (item) => !item.serviceRecordId || !demoServiceIds.has(item.serviceRecordId),
+        ),
+      ],
       setup: { completed: true, demoData: false },
     });
   }
@@ -401,10 +446,132 @@ export class GarageStore {
     return this.persist(nextState) ? record : null;
   }
 
+  addFuel(input: NewFuelRecord): FuelRecord | null {
+    if (this.recoverySignal() || !this.setup().completed) return null;
+    const validation = validateNewFuelRecord(input, this.motorcycle().currentMileage);
+    if (!validation.valid) return null;
+
+    const createdAt = new Date().toISOString();
+    const record: FuelRecord = {
+      id: this.createId('fuel'),
+      motorcycleId: this.motorcycle().id,
+      fueledAt: input.fueledAt,
+      mileage: input.mileage,
+      liters: input.liters,
+      totalCost: input.totalCost,
+      fullTank: input.fullTank,
+      station: input.station?.trim() || undefined,
+      notes: input.notes?.trim() || undefined,
+      createdAt,
+    };
+    const odometerRecord: OdometerRecord = {
+      id: this.createId('odometer'),
+      motorcycleId: this.motorcycle().id,
+      mileage: record.mileage,
+      recordedAt: record.fueledAt,
+      source: 'fuel',
+      note:
+        record.mileage < this.motorcycle().currentMileage
+          ? 'Leitura histórica registrada com abastecimento; odômetro atual preservado.'
+          : 'Leitura registrada com abastecimento.',
+      fuelRecordId: record.id,
+    };
+    const nextState: GarageState = {
+      ...this.stateSignal(),
+      motorcycle:
+        record.mileage > this.motorcycle().currentMileage
+          ? { ...this.motorcycle(), currentMileage: record.mileage, updatedAt: createdAt }
+          : this.motorcycle(),
+      fuelHistory: [record, ...this.stateSignal().fuelHistory],
+      odometerHistory: [odometerRecord, ...this.stateSignal().odometerHistory],
+    };
+    return this.persist(nextState) ? record : null;
+  }
+
+  addExpense(input: NewExpenseRecord): ExpenseRecord | null {
+    if (
+      this.recoverySignal() ||
+      !this.setup().completed ||
+      !input.title.trim() ||
+      !Number.isFinite(input.amount) ||
+      input.amount < 0
+    ) {
+      return null;
+    }
+    const record: ExpenseRecord = {
+      ...input,
+      id: this.createId('expense'),
+      motorcycleId: this.motorcycle().id,
+      title: input.title.trim(),
+      notes: input.notes?.trim() || undefined,
+      createdAt: new Date().toISOString(),
+    };
+    return this.persist({
+      ...this.stateSignal(),
+      expenseHistory: [record, ...this.stateSignal().expenseHistory],
+    })
+      ? record
+      : null;
+  }
+
+  addOccurrence(input: NewOccurrenceRecord): OccurrenceRecord | null {
+    if (
+      this.recoverySignal() ||
+      !this.setup().completed ||
+      !input.title.trim() ||
+      !Number.isInteger(input.mileage) ||
+      input.mileage < 0 ||
+      Number.isNaN(Date.parse(input.occurredAt))
+    ) {
+      return null;
+    }
+    const record: OccurrenceRecord = {
+      ...input,
+      id: this.createId('occurrence'),
+      motorcycleId: this.motorcycle().id,
+      title: input.title.trim(),
+      notes: input.notes?.trim() || undefined,
+      createdAt: new Date().toISOString(),
+    };
+    return this.persist({
+      ...this.stateSignal(),
+      occurrenceHistory: [record, ...this.stateSignal().occurrenceHistory],
+    })
+      ? record
+      : null;
+  }
+
+  addSafetyCheck(input: NewSafetyCheckRecord): SafetyCheckResult {
+    if (this.recoverySignal() || !this.setup().completed) {
+      return { ok: false, error: 'Configure sua NX200 e resolva os dados locais antes de salvar.' };
+    }
+    const result = buildSafetyCheckRecord(
+      input,
+      NX200_PRE_RIDE_CHECKLIST,
+      this.motorcycle().id,
+      this.createId('safety-check'),
+      new Date().toISOString(),
+    );
+    if (!result.ok) return result;
+    return this.persist({
+      ...this.stateSignal(),
+      safetyCheckHistory: [result.record, ...this.stateSignal().safetyCheckHistory],
+    })
+      ? result
+      : { ok: false, error: 'Não foi possível salvar a inspeção neste dispositivo.' };
+  }
+
   updateSettings(maintenanceAlertsEnabled: boolean): boolean {
     return this.persist({
       ...this.stateSignal(),
       settings: { ...this.settings(), maintenanceAlertsEnabled },
+    });
+  }
+
+  updateTheme(theme: GarageTheme): boolean {
+    return this.persist({
+      ...this.stateSignal(),
+      settings: { ...this.settings(), theme },
     });
   }
 
@@ -519,6 +686,14 @@ export class GarageStore {
       source: request.source,
       note: request.note?.trim() || undefined,
     };
+  }
+
+  private withoutMaintenanceExecution(
+    item: GarageState['maintenancePlan'][number],
+  ): GarageState['maintenancePlan'][number] {
+    const copy = { ...item };
+    delete copy.lastExecution;
+    return copy;
   }
 
   private changeProcedureExecution(

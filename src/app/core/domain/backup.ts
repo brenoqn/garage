@@ -3,8 +3,10 @@ import { GarageState } from '../models/garage-state.model';
 import { Procedure } from '../models/procedure.model';
 import {
   migrateGarageStateV2,
+  migrateGarageStateV3,
   validateGarageState,
   validateGarageStateV2,
+  validateGarageStateV3,
 } from './garage-state-migration';
 
 export function createGarageBackup(state: GarageState, exportedAt: string): string {
@@ -30,7 +32,7 @@ export function createGarageBackup(state: GarageState, exportedAt: string): stri
   };
   const backup: GarageBackup = {
     product: 'garage',
-    schemaVersion: 3,
+    schemaVersion: 4,
     exportedAt,
     state: backupState,
   };
@@ -62,6 +64,10 @@ export function summarizeGarageBackup(state: GarageState): GarageBackupSummary {
     odometerRecords: state.odometerHistory.length,
     maintenanceItems: state.maintenancePlan.length,
     procedureExecutions: state.procedureExecutions.length,
+    fuelRecords: state.fuelHistory.length,
+    expenseRecords: state.expenseHistory.length,
+    occurrenceRecords: state.occurrenceHistory.length,
+    safetyChecks: state.safetyCheckHistory.length,
   };
 }
 
@@ -84,7 +90,11 @@ export function parseGarageBackup(
   if (candidate['product'] !== 'garage') {
     return { ok: false, error: 'O arquivo não foi identificado como um backup do Garage.' };
   }
-  if (candidate['schemaVersion'] !== 2 && candidate['schemaVersion'] !== 3) {
+  if (
+    candidate['schemaVersion'] !== 2 &&
+    candidate['schemaVersion'] !== 3 &&
+    candidate['schemaVersion'] !== 4
+  ) {
     return {
       ok: false,
       error: 'A versão deste backup é incompatível com esta versão do Garage.',
@@ -104,7 +114,7 @@ export function parseGarageBackup(
 
   const backup: GarageBackup = {
     product: 'garage',
-    schemaVersion: 3,
+    schemaVersion: 4,
     exportedAt: candidate['exportedAt'],
     state,
   };
@@ -113,12 +123,18 @@ export function parseGarageBackup(
 
 function parseBackupState(
   value: unknown,
-  schemaVersion: 2 | 3,
+  schemaVersion: 2 | 3 | 4,
   procedures: readonly Procedure[],
 ): GarageState | string {
   if (schemaVersion === 2) {
     const validation = validateGarageStateV2(value);
-    return validation.valid ? migrateGarageStateV2(validation.state) : validation.error;
+    return validation.valid
+      ? migrateGarageStateV3(migrateGarageStateV2(validation.state))
+      : validation.error;
+  }
+  if (schemaVersion === 3) {
+    const validation = validateGarageStateV3(value, procedures);
+    return validation.valid ? migrateGarageStateV3(validation.state) : validation.error;
   }
   const validation = validateGarageState(value, procedures);
   return validation.valid ? validation.state : validation.error;

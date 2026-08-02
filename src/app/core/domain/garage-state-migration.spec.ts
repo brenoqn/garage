@@ -6,6 +6,7 @@ import {
   GarageStateV2,
   migrateGarageStateV1,
   migrateGarageStateV2,
+  migrateGarageStateV3,
   validateGarageState,
 } from './garage-state-migration';
 
@@ -37,7 +38,8 @@ const stateV2: GarageStateV2 = {
   settings: legacyState.settings,
   setup: { completed: true, demoData: false },
 };
-const safeState: GarageState = migrateGarageStateV2(stateV2);
+const stateV3 = migrateGarageStateV2(stateV2);
+const safeState: GarageState = migrateGarageStateV3(stateV3);
 
 describe('garage state migration', () => {
   it('migrates schema 2 to schema 3 preserving every existing field', () => {
@@ -45,17 +47,30 @@ describe('garage state migration', () => {
     expect(migrated).toEqual({ ...stateV2, schemaVersion: 3, procedureExecutions: [] });
   });
 
-  it('chains schema 1 through schema 2 to schema 3 without losing existing data', () => {
+  it('migrates schema 3 to schema 4 with empty daily-use histories and dark theme', () => {
+    const migrated = migrateGarageStateV3(stateV3);
+    expect(migrated).toMatchObject({
+      schemaVersion: 4,
+      fuelHistory: [],
+      expenseHistory: [],
+      occurrenceHistory: [],
+      safetyCheckHistory: [],
+      settings: { maintenanceAlertsEnabled: true, theme: 'dark' },
+    });
+    expect(migrated.motorcycle).toEqual(stateV3.motorcycle);
+  });
+
+  it('chains schema 1 through schema 4 without losing existing data', () => {
     const migrated = migrateGarageStateV1(legacyState);
-    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.schemaVersion).toBe(4);
     expect(migrated.motorcycle).toEqual(legacyState.motorcycle);
     expect(migrated.maintenancePlan).toEqual(legacyState.maintenancePlan);
     expect(migrated.odometerHistory[0]?.mileage).toBe(12_345);
     expect(migrated.procedureExecutions).toEqual([]);
   });
 
-  it('is idempotent once the state reaches schema 3', () => {
-    const migrated = migrateGarageStateV2(stateV2);
+  it('is idempotent once the state reaches schema 4', () => {
+    const migrated = migrateGarageStateV3(migrateGarageStateV2(stateV2));
     const decoded = decodeStoredGarageState(JSON.stringify(migrated), safeState, NX200_PROCEDURES);
     expect(decoded.kind).toBe('current');
     expect(decoded.state).toEqual(migrated);
@@ -64,6 +79,19 @@ describe('garage state migration', () => {
   it('detects schema 2 and migrates it exactly once', () => {
     const first = decodeStoredGarageState(JSON.stringify(stateV2), safeState, NX200_PROCEDURES);
     expect(first.kind).toBe('migrated');
+    const second = decodeStoredGarageState(
+      JSON.stringify(first.state),
+      safeState,
+      NX200_PROCEDURES,
+    );
+    expect(second.kind).toBe('current');
+    expect(second.state).toEqual(first.state);
+  });
+
+  it('detects schema 3 and migrates it exactly once', () => {
+    const first = decodeStoredGarageState(JSON.stringify(stateV3), safeState, NX200_PROCEDURES);
+    expect(first.kind).toBe('migrated');
+    expect(first.state.schemaVersion).toBe(4);
     const second = decodeStoredGarageState(
       JSON.stringify(first.state),
       safeState,
@@ -115,5 +143,26 @@ describe('garage state migration', () => {
         NX200_PROCEDURES,
       ).valid,
     ).toBe(false);
+  });
+
+  it('rejects invalid daily-use records without replacing the safe state', () => {
+    const invalid = {
+      ...safeState,
+      fuelHistory: [
+        {
+          id: 'fuel-1',
+          motorcycleId: motorcycle.id,
+          fueledAt: 'invalid',
+          mileage: 10_000,
+          liters: 0,
+          totalCost: 50,
+          fullTank: true,
+          createdAt: '2026-08-02T10:00:00.000Z',
+        },
+      ],
+    };
+    const decoded = decodeStoredGarageState(JSON.stringify(invalid), safeState, NX200_PROCEDURES);
+    expect(decoded.kind).toBe('invalid-state');
+    expect(decoded.state).toBe(safeState);
   });
 });

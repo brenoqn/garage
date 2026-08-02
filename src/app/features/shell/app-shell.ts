@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  HostListener,
+  inject,
+  signal,
+} from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { GarageStore } from '../../core/services/garage-store.service';
 
@@ -15,4 +24,21 @@ export class AppShell {
   protected readonly modelLabel = computed(
     () => `${this.motorcycle().manufacturer} ${this.motorcycle().model}`,
   );
+  protected readonly quickMenuOpen = signal(false);
+
+  constructor() {
+    const document = inject(DOCUMENT);
+    effect(() => {
+      document.documentElement.dataset['theme'] = this.store.settings().theme;
+    });
+  }
+
+  protected closeQuickMenu(): void {
+    this.quickMenuOpen.set(false);
+  }
+
+  @HostListener('document:keydown.escape')
+  protected closeOnEscape(): void {
+    this.closeQuickMenu();
+  }
 }

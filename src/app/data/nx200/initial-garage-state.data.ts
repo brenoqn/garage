@@ -2,7 +2,7 @@ import { GarageState } from '../../core/models/garage-state.model';
 import { NX200_MAINTENANCE_PLAN } from './maintenance-plan/nx200-maintenance-plan.data';
 
 export const INITIAL_GARAGE_STATE: GarageState = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   motorcycle: {
     id: 'nx200-primary',
     manufacturer: 'Honda',
@@ -42,6 +42,10 @@ export const INITIAL_GARAGE_STATE: GarageState = {
   ],
   odometerHistory: [],
   procedureExecutions: [],
-  settings: { maintenanceAlertsEnabled: true },
+  fuelHistory: [],
+  expenseHistory: [],
+  occurrenceHistory: [],
+  safetyCheckHistory: [],
+  settings: { maintenanceAlertsEnabled: true, theme: 'dark' },
   setup: { completed: false, demoData: true },
 };
