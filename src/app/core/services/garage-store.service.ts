@@ -3,10 +3,16 @@ import {
   INITIAL_GARAGE_STATE,
   NX200_PROCEDURES,
   NX200_SPECIFICATIONS,
+  NX200_TECHNICAL_CLAIMS,
+  NX200_TECHNICAL_SOURCES,
 } from '../../data/nx200-demo.data';
 import { createGarageBackup } from '../domain/backup';
 import { decodeStoredGarageState, validateGarageState } from '../domain/garage-state-migration';
 import { evaluateOdometerUpdate } from '../domain/odometer-policy';
+import {
+  criticalProcedureCompletionBlocked,
+  detectTechnicalConflicts,
+} from '../domain/technical-content';
 import {
   cancelProcedureExecution,
   completeProcedureStep,
@@ -78,6 +84,8 @@ export class GarageStore {
   readonly recovery = this.recoverySignal.asReadonly();
   readonly procedures = signal(NX200_PROCEDURES).asReadonly();
   readonly specifications = signal(NX200_SPECIFICATIONS).asReadonly();
+  readonly technicalClaims = signal(NX200_TECHNICAL_CLAIMS).asReadonly();
+  readonly technicalSources = signal(NX200_TECHNICAL_SOURCES).asReadonly();
 
   startProcedure(
     procedureSlug: string,
@@ -140,6 +148,27 @@ export class GarageStore {
   }
 
   finishProcedure(executionId: string, note?: string): ProcedureExecutionResult {
+    const execution = this.stateSignal().procedureExecutions.find(
+      (candidate) => candidate.id === executionId,
+    );
+    const procedure = execution
+      ? NX200_PROCEDURES.find((candidate) => candidate.slug === execution.procedureSlug)
+      : undefined;
+    if (procedure) {
+      const claimIds = new Set(procedure.technicalClaimIds);
+      const claims = NX200_TECHNICAL_CLAIMS.filter((claim) => claimIds.has(claim.id));
+      if (criticalProcedureCompletionBlocked(procedure.riskLevel, claims)) {
+        return {
+          ok: false,
+          error:
+            'Este procedimento possui informações técnicas conflitantes e não pode ser concluído até a resolução editorial.',
+        };
+      }
+      const conflicts = detectTechnicalConflicts(claims);
+      if (conflicts.length > 0) {
+        return { ok: false, error: 'Existem fontes técnicas divergentes neste procedimento.' };
+      }
+    }
     return this.changeProcedureExecution(executionId, (procedure, execution, now) =>
       finishProcedureExecution(procedure, execution, now, note),
     );

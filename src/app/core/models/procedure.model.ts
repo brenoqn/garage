@@ -1,6 +1,7 @@
-import { TechnicalSource } from './technical-source.model';
+import { ContentRevision, MotorcycleApplicability } from './technical-source.model';
 
 export type ProcedureDifficulty = 'easy' | 'moderate' | 'advanced';
+export type ProcedureRiskLevel = 'low' | 'moderate' | 'high' | 'critical';
 
 export interface ProcedureResource {
   readonly id: string;
@@ -28,25 +29,24 @@ export interface ProcedureStep {
   readonly suggestedTimerSeconds?: number;
 }
 
-export interface ProcedureTechnicalValue {
-  readonly label: string;
-  readonly value: string;
-  readonly source: TechnicalSource;
-}
-
 export interface Procedure {
   readonly slug: string;
   readonly title: string;
   readonly category: string;
   readonly description: string;
   readonly difficulty: ProcedureDifficulty;
+  readonly riskLevel: ProcedureRiskLevel;
+  readonly riskNote: string;
   readonly estimatedMinutes: number;
   readonly tools: readonly ProcedureResource[];
   readonly materials: readonly ProcedureResource[];
   readonly safetyWarnings: readonly ProcedureWarning[];
   readonly steps: readonly ProcedureStep[];
   readonly images?: readonly string[];
-  readonly technicalValues: readonly ProcedureTechnicalValue[];
+  readonly technicalClaimIds: readonly string[];
+  readonly primarySourceIds: readonly string[];
+  readonly applicability: MotorcycleApplicability;
+  readonly editorialRevision: ContentRevision;
   readonly commonMistakes: readonly string[];
   readonly finalChecks: readonly ProcedureFinalCheck[];
   readonly contentNote?: string;

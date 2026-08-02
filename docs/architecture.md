@@ -9,9 +9,9 @@ confirmações.
 ```text
 UI / rotas
     ↓
-GarageStore + serviços de navegador
+GarageStore + catálogo editorial estático + serviços de navegador
     ↓
-regras puras: execução, migração, backup, odômetro, cronologia e manutenção
+regras puras: conteúdo técnico, execução, migração, backup, odômetro e manutenção
     ↓
 StoragePort
     ↓
@@ -22,6 +22,47 @@ LocalStorageAdapter (`garage_state`)
 `core/services` coordena estado e APIs opcionais; `core/storage` isola o LocalStorage;
 `features` contém páginas standalone; `data` mantém o catálogo estático da Honda NX200; e
 `shared` abriga componentes reutilizáveis.
+
+## Catálogo técnico editorial
+
+O catálogo da NX200 é conteúdo versionado no aplicativo e não estado do usuário:
+
+```text
+data/nx200/
+├── sources/              # metadados dos documentos necessários ou disponíveis
+├── claims/               # afirmações técnicas, valores, citações e revisões
+├── specifications/       # agrupamento visual por sistema → claimId
+├── procedures/           # seis procedimentos e metadados editoriais
+├── maintenance-plan/     # seed do plano e referências estáveis às claims
+├── initial-garage-state.data.ts
+└── nx200-catalog.ts      # composição validada
+```
+
+`TechnicalDocumentSource` registra somente metadados e disponibilidade; não incorpora cópias de
+manuais. `TechnicalCitation` localiza página, seção, tabela ou figura. `TechnicalClaim` unifica
+valor estruturado, estado editorial, aplicabilidade, citações, revisões e eventual supersessão.
+`ContentRevision` é a versão editorial do procedimento e não se relaciona ao `schemaVersion`.
+
+O modelo persistido `MaintenancePlanItem.technicalSource` permanece como projeção de
+compatibilidade dos schemas 1–3. Ele pode carregar `claimIds`, mas não duplica documentos,
+citações ou revisões. A fonte de verdade editorial é `NX200_TECHNICAL_CATALOG`.
+
+## Política e validação do conteúdo
+
+`technical-content.ts` centraliza correspondência e sobreposição de aplicabilidade, linguagem de
+status, uso em checklist, permissão operacional, risco e conflito. Apenas uma claim `confirmed`
+com aplicabilidade confirmada, citação localizada, revisão vigente aprovada e ausência de
+conflito pode ser usada operacionalmente.
+
+`technical-catalog-validator.ts` verifica fontes, claims, citações, páginas, revisões,
+supersessões, procedimentos, plano e IDs persistidos. Conflitos entre claims confirmadas com o
+mesmo tópico, valores diferentes e aplicabilidade sobreposta são relatados; o código não escolhe
+uma fonte vencedora. `npm run validate:content` executa o catálogo real e retorna erro para
+violações bloqueantes.
+
+Os registros atuais são placeholders de documentos indisponíveis. Todas as claims estão
+`demonstrative`, sem citações ou revisões, com valor `A confirmar`. Não há claim confirmada nem
+conflito de produção.
 
 ## Estado persistido
 
@@ -44,6 +85,10 @@ O catálogo de procedimentos e as especificações continuam estáticos e recons
 persiste apenas dados do usuário e referências a IDs estáveis do catálogo. A validação de runtime
 recusa IDs desconhecidos, duplicados, vínculos quebrados e mais de uma execução ativa do mesmo
 procedimento para a mesma motocicleta.
+
+A Sprint 4 não mudou essa estrutura: o schema permanece 3 e nenhuma migração vazia foi criada.
+Backups continuam contendo somente moto, plano, serviços, odômetro, execuções, preferências e
+setup. Documentos, claims, citações, revisões e procedimentos ficam fora do arquivo.
 
 ## Migração e recuperação
 
@@ -120,8 +165,20 @@ Etapas, alertas, verificações, ferramentas e materiais são estruturados e pos
 que não dependem de posição ou texto. Testes garantem slugs e IDs únicos, não vazios e referências
 válidas. Campos para imagens futuras existem, mas nenhuma imagem mecânica foi adicionada.
 
-Todo valor técnico atual permanece `needs-confirmation` e `A confirmar`. Checklists avançados
-podem ser concluídos, mas a interface não afirma segurança ou aprovação mecânica.
+Slugs, etapas, alertas e verificações possuem uma lista protegida por teste para impedir que a
+reorganização do catálogo invalide execuções existentes. Todo valor técnico atual permanece
+`demonstrative` e `A confirmar`; a projeção persistida do plano continua
+`needs-confirmation`. Checklists de risco alto ou crítico recebem advertência reforçada, e a
+interface nunca afirma segurança ou aprovação mecânica. Conflito explícito bloqueia conclusão
+operacional.
+
+## Transparência na interface
+
+`/technical-sources` mostra documento, tipo, editor, edição, mercado, disponibilidade, citações e
+conteúdos relacionados, sem download não autorizado. `/specifications` associa cada item a uma
+claim e oferece filtros por sistema, estado, ano e aplicabilidade. Procedimento e preparação
+mostram versão editorial, risco, aplicabilidade, contagens pendentes e acesso às fontes. O modo
+oficina mantém apenas um vínculo compacto para não competir com a etapa atual.
 
 ## Modo oficina, temporizador e Wake Lock
 
@@ -151,6 +208,8 @@ básica offline. O manifesto usa **Garage** e inicia em `/dashboard`. `npm run b
 
 - um navegador, uma Honda NX200 e LocalStorage sem criptografia ou sincronização;
 - conteúdo mecânico demonstrativo ainda sem validação documental;
+- ano de fabricação, ano-modelo, mercado, variante e código do motor ainda não verificados;
+- nenhuma fonte real, citação localizada, revisão aprovada ou claim confirmada;
 - temporizadores não persistem após fechar completamente o navegador;
 - Wake Lock depende de suporte e permissão do navegador;
 - sem imagens, anexos, exclusão de execuções, push, backend ou autenticação.

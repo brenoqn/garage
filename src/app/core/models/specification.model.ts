@@ -1,9 +1,19 @@
-import { TechnicalSource } from './technical-source.model';
+export type TechnicalSystem =
+  | 'motor'
+  | 'lubrication'
+  | 'fuel'
+  | 'ignition'
+  | 'electrical'
+  | 'transmission'
+  | 'suspension'
+  | 'wheels-tires'
+  | 'brakes'
+  | 'dimensions'
+  | 'capacities'
+  | 'maintenance';
 
 export interface TechnicalSpecification {
   readonly id: string;
-  readonly group: string;
-  readonly label: string;
-  readonly value: string;
-  readonly source: TechnicalSource;
+  readonly system: TechnicalSystem;
+  readonly claimId: string;
 }

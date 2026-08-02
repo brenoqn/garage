@@ -2,18 +2,23 @@
 
 ## Regra principal
 
-Nunca inferir, completar ou “aproximar” valores mecânicos da Honda NX200. Se uma informação
-não estiver confirmada em documentação confiável e aplicável, publique `A confirmar`.
+Nunca inferir, completar ou aproximar valores mecânicos da Honda NX200. Se uma informação não
+estiver confirmada em documentação confiável e aplicável, publique `A confirmar`.
 
-## Fonte técnica
+## Fonte, citação e claim
 
-Cada valor técnico deve possuir:
+Uma fonte registra metadados do documento: tipo, título, editor ou fabricante, edição, ano,
+idioma, mercado e disponibilidade. Ela não contém o arquivo integral nem autoriza sua
+redistribuição.
 
-- estado `confirmed` ou `needs-confirmation`;
-- nome claro da fonte;
-- referência de edição/ano quando aplicável;
-- seção ou página, quando disponível;
-- observação sobre variantes de mercado ou ano-modelo.
+Uma citação precisa apontar para uma fonte cadastrada e para uma localização verificável:
+página positiva, página rotulada, seção, tabela ou figura. “Manual da moto” não é citação
+suficiente. Notas de trecho devem resumir o contexto, sem reproduzir extensamente conteúdo
+protegido.
+
+Uma claim representa uma única afirmação técnica e possui ID estável, tópico, valor estruturado,
+aplicabilidade, citações, revisões e estado editorial. Valores podem ser escalares, faixas,
+listas ou texto. Nunca transforme `A confirmar` em número, intervalo ou unidade por inferência.
 
 Fontes preferidas, em ordem:
 
@@ -25,51 +30,76 @@ Fontes preferidas, em ordem:
 Fóruns, vídeos, lojas e conteúdo sem autoria técnica podem inspirar tópicos, mas não confirmam
 valores.
 
+## Estados editoriais
+
+- `demonstrative`: ilustra a interface; nunca é operacional;
+- `transcribed`: veio de fonte identificada, mas ainda não foi revisado;
+- `under-review`: interpretação, aplicabilidade ou segurança em análise;
+- `confirmed`: possui citação localizada, aplicabilidade confirmada e revisão aprovada vigente;
+- `conflicting`: fontes ou interpretações divergem e bloqueiam uso operacional;
+- `deprecated`: foi substituído ou invalidado;
+- `not-applicable`: não corresponde à configuração selecionada.
+
+Não use “oficial”, “seguro” ou “garantido” como badge. Uma transcrição não é confirmação. Uma
+mudança em valor, unidade, condição ou aplicabilidade exige nova revisão; a aprovação antiga não
+é reutilizada silenciosamente.
+
+## Aplicabilidade e conflito
+
+Registre fabricante e modelo, confirmação do escopo e, quando conhecidos, ano inicial/final,
+mercado, variante e código do motor. Campo ausente significa desconhecido ou escopo ainda não
+delimitado conforme o estado; não significa compatibilidade automática.
+
+Não reutilize valores de XR200, CBX200, NX150 ou qualquer outro modelo sem claim específica,
+fonte localizada e revisão. Claims confirmadas do mesmo tópico com valores diferentes e escopo
+sobreposto formam conflito. O conteúdo permanece visível para análise, mas não pode habilitar
+alerta, recomendação ou conclusão operacional.
+
+## Revisão
+
+Revisões são dados editoriais versionados no repositório, não ações do usuário local. Cada uma
+registra ID, data, revisor, decisão e notas. A decisão vigente deve ser `approved` para confirmar
+uma claim. `changes-requested` e `rejected` impedem confirmação. Consulte
+`technical-review-policy.md`.
+
 ## Estrutura de procedimentos
 
 Todo procedimento deve conter:
 
-1. título e categoria;
-2. descrição e dificuldade;
-3. tempo estimado;
-4. ferramentas e materiais;
-5. alertas de segurança;
-6. etapas curtas, em ordem;
-7. imagens opcionais com direitos de uso;
-8. valores técnicos e fontes;
-9. erros comuns;
-10. verificações finais.
+1. título, categoria, dificuldade e risco;
+2. descrição e tempo estimado editorial;
+3. ferramentas e materiais;
+4. alertas de segurança;
+5. etapas curtas, em ordem;
+6. imagens opcionais com direitos de uso;
+7. referências a claims técnicas;
+8. erros comuns e verificações finais;
+9. aplicabilidade e revisão editorial.
 
 Etapas, alertas, verificações, ferramentas e materiais possuem IDs estáveis usados pelo estado
-persistido. Alterar texto ou tradução não deve alterar o ID. Remover ou trocar um ID exige uma
+persistido. Alterar texto ou tradução não deve alterar o ID. Remover ou trocar um ID exige
 migração capaz de preservar execuções existentes.
 
 Use verbos de ação e uma tarefa por etapa. Explique quando parar e procurar um profissional.
-Não diga que um procedimento é seguro sem apresentar condições e riscos.
-Um checklist pode ser concluído com valores `needs-confirmation`, mas a interface deve informar
-que a validação técnica permanece pendente. Para sistemas críticos, use linguagem de inspeção e
-nunca frases como “moto segura”, “freio aprovado” ou equivalentes.
+Dificuldade descreve complexidade; `riskLevel` descreve a consequência potencial de erro.
+Conteúdo de risco alto ou crítico com claims pendentes exige advertência reforçada. Conflito
+técnico bloqueia uso operacional.
 
-A conclusão do procedimento registra apenas que o usuário percorreu o checklist. Ela não cria
-um serviço, não confirma a execução mecânica e não substitui avaliação profissional. Imagens
-futuras precisam de licença e referência; nenhuma imagem mecânica faz parte da Sprint 3.
+A conclusão registra apenas que o usuário percorreu o checklist. Ela não cria serviço, não
+confirma a execução mecânica e não substitui avaliação profissional. Para sistemas críticos, use
+linguagem de inspeção e nunca “moto segura”, “freio aprovado” ou equivalentes.
 
-## Linguagem
+## Linguagem, imagens e marcas
 
-- Escreva em português do Brasil, com frases diretas.
-- Diferencie inspeção, ajuste, substituição e confirmação.
-- Não transforme observação visual em diagnóstico definitivo.
-- Evite termos como “sempre” e “nunca”, exceto em alertas universais de segurança.
-- Mostre unidades junto dos valores e preserve o sistema usado pela fonte.
+- escreva em português do Brasil, com frases diretas;
+- diferencie inspeção, ajuste, substituição e confirmação;
+- não transforme observação visual em diagnóstico definitivo;
+- mostre unidades junto dos valores e preserve o sistema da fonte;
+- não use logotipos Honda, páginas escaneadas ou imagens sem licença;
+- imagens próprias devem mostrar equipamento de proteção e riscos relevantes.
 
-## Imagens e marcas
+## Publicação
 
-Não usar logotipos Honda, fotografias protegidas, páginas escaneadas de manuais ou ilustrações
-sem licença. Imagens próprias devem mostrar somente o necessário e não ocultar equipamento de
-proteção ou riscos.
-
-## Revisão
-
-Antes de publicar conteúdo novo, um revisor deve conferir estrutura, segurança, aplicabilidade
-ao ano/modelo, fonte e consistência das unidades. Mudanças em valores confirmados exigem teste
-de regressão dos dados apresentados.
+Siga `technical-source-ingestion.md` para incorporar uma fonte. Antes de publicar, execute
+`npm run validate:content`, testes, lint e build. O validador não substitui revisão humana.
+Alterações editoriais relevantes incrementam a versão do procedimento.

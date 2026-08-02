@@ -26,6 +26,8 @@ técnica oficial.
 - registro opcional de manutenção depois da conclusão;
 - alertas dentro do aplicativo;
 - modo claro e instalação como PWA.
+- transparência editorial de fontes, aplicabilidade, revisão e conflitos;
+- especificações e procedimentos versionados sem publicar valores não verificados.
 
 Não fazem parte desta etapa: outras motos, backend, autenticação, sincronização, colaboração,
 notificações push, compra de peças, diagnósticos automatizados ou conteúdo mecânico sem revisão.
@@ -41,6 +43,10 @@ notificações push, compra de peças, diagnósticos automatizados ou conteúdo 
 - **Uso na oficina:** controles grandes, contraste e leitura rápida em telas pequenas.
 - **Progresso sob controle:** pausar preserva a execução; cancelar ou reiniciar exige confirmação.
 - **Separação de intenções:** concluir um guia não registra manutenção nem atesta segurança.
+- **Evidência antes da autoridade:** aparência, transcrição ou conhecimento geral não tornam um
+  valor confirmado; a interface deve revelar documento, localização, aplicabilidade e revisão.
+- **Conflito visível:** fontes divergentes bloqueiam uso operacional e permanecem disponíveis
+  para resolução editorial, sem decisão automática.
 
 ## Métricas futuras
 

@@ -95,7 +95,8 @@ function isTechnicalSource(value: unknown): boolean {
     isRecord(value) &&
     (value['status'] === 'confirmed' || value['status'] === 'needs-confirmation') &&
     isNonEmptyString(value['label']) &&
-    isOptionalString(value['reference'])
+    isOptionalString(value['reference']) &&
+    (value['claimIds'] === undefined || isStringArray(value['claimIds']))
   );
 }
 

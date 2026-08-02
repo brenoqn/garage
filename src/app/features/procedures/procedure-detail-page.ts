@@ -1,7 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import {
+  detectTechnicalConflicts,
+  formatTechnicalValue,
+  technicalStatusLabel,
+  technicalStatusMessage,
+} from '../../core/domain/technical-content';
 import { selectActiveProcedureExecution } from '../../core/domain/procedure-execution';
-import { ProcedureDifficulty } from '../../core/models/procedure.model';
+import { ProcedureDifficulty, ProcedureRiskLevel } from '../../core/models/procedure.model';
+import { TechnicalClaim, TechnicalContentStatus } from '../../core/models/technical-source.model';
 import { GarageStore } from '../../core/services/garage-store.service';
 
 @Component({
@@ -33,6 +40,43 @@ import { GarageStore } from '../../core/services/garage-store.service';
             </div>
           </div>
         </header>
+
+        <section class="card editorial-summary" aria-labelledby="editorial-title">
+          <div>
+            <p class="eyebrow">Transparência do conteúdo</p>
+            <h2 id="editorial-title">Versão editorial {{ guide.editorialRevision.version }}</h2>
+            <p>{{ guide.editorialRevision.summary }}</p>
+          </div>
+          <dl class="technical-metadata">
+            <div>
+              <dt>Estado</dt>
+              <dd>{{ statusLabel(guide.editorialRevision.status) }}</dd>
+            </div>
+            <div>
+              <dt>Última revisão</dt>
+              <dd>{{ guide.editorialRevision.revisedAt }}</dd>
+            </div>
+            <div>
+              <dt>Risco</dt>
+              <dd>{{ riskLabel(guide.riskLevel) }}</dd>
+            </div>
+            <div>
+              <dt>Aplicabilidade</dt>
+              <dd>{{ applicabilityLabel() }}</dd>
+            </div>
+            <div>
+              <dt>Valores confirmados</dt>
+              <dd>{{ confirmedClaimCount() }}</dd>
+            </div>
+            <div>
+              <dt>Valores pendentes</dt>
+              <dd>{{ pendingClaimCount() }}</dd>
+            </div>
+          </dl>
+          <p class="risk-note"><strong>Por que este risco:</strong> {{ guide.riskNote }}</p>
+          <p><strong>Fontes principais:</strong> {{ primarySourceLabel() }}</p>
+          <a class="text-button" routerLink="/technical-sources">Abrir transparência das fontes</a>
+        </section>
 
         @if (activeExecution(); as active) {
           <section class="card active-execution-card">
@@ -94,12 +138,19 @@ import { GarageStore } from '../../core/services/garage-store.service';
                 </div>
               </div>
               <div class="technical-table">
-                @for (item of guide.technicalValues; track item.label) {
-                  <div>
-                    <span>{{ item.label }}</span
-                    ><strong>{{ item.value }}</strong
-                    ><small>Fonte: {{ item.source.label }}</small>
-                  </div>
+                @for (item of technicalClaims(); track item.id) {
+                  <article [class.conflict-card]="claimHasConflict(item.id)">
+                    <span>{{ item.label }}</span>
+                    <strong>{{ claimValue(item) }}</strong>
+                    <small>{{ statusLabel(item.status) }} · {{ statusMessage(item.status) }}</small>
+                    <a
+                      class="text-button"
+                      routerLink="/technical-sources"
+                      [fragment]="'claim-' + item.id"
+                    >
+                      Ver fonte técnica
+                    </a>
+                  </article>
                 }
               </div>
               <p class="source-warning compact">
@@ -195,7 +246,61 @@ export class ProcedureDetailPage {
         )
       : undefined;
   });
+  protected readonly technicalClaims = computed(() => {
+    const procedure = this.procedure();
+    if (!procedure) return [];
+    const claimById = new Map(this.store.technicalClaims().map((claim) => [claim.id, claim]));
+    return procedure.technicalClaimIds.flatMap((claimId) => {
+      const claim = claimById.get(claimId);
+      return claim ? [claim] : [];
+    });
+  });
+  private readonly conflicts = computed(() =>
+    detectTechnicalConflicts(this.store.technicalClaims()),
+  );
+  protected readonly confirmedClaimCount = computed(
+    () => this.technicalClaims().filter((claim) => claim.status === 'confirmed').length,
+  );
+  protected readonly pendingClaimCount = computed(
+    () => this.technicalClaims().filter((claim) => claim.status !== 'confirmed').length,
+  );
   protected difficultyLabel(difficulty: ProcedureDifficulty): string {
     return { easy: 'Fácil', moderate: 'Moderada', advanced: 'Avançada' }[difficulty];
+  }
+
+  protected riskLabel(risk: ProcedureRiskLevel): string {
+    return { low: 'Baixo', moderate: 'Moderado', high: 'Alto', critical: 'Crítico' }[risk];
+  }
+
+  protected statusLabel(status: TechnicalContentStatus): string {
+    return technicalStatusLabel(status);
+  }
+
+  protected statusMessage(status: TechnicalContentStatus): string {
+    return technicalStatusMessage(status);
+  }
+
+  protected claimValue(claim: TechnicalClaim): string {
+    return formatTechnicalValue(claim.value);
+  }
+
+  protected claimHasConflict(claimId: string): boolean {
+    return this.conflicts().some((conflict) => conflict.claimIds.includes(claimId));
+  }
+
+  protected applicabilityLabel(): string {
+    const applicability = this.procedure()?.applicability;
+    return applicability?.confirmation === 'confirmed'
+      ? 'Definida editorialmente'
+      : 'Ano, mercado e variante a confirmar';
+  }
+
+  protected primarySourceLabel(): string {
+    const procedure = this.procedure();
+    if (!procedure) return 'Nenhuma';
+    const sourceById = new Map(this.store.technicalSources().map((source) => [source.id, source]));
+    return procedure.primarySourceIds
+      .map((sourceId) => sourceById.get(sourceId)?.title ?? sourceId)
+      .join('; ');
   }
 }

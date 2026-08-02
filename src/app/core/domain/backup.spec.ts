@@ -32,6 +32,8 @@ describe('Garage backup', () => {
     expect(parsed['exportedAt']).toBe('2026-07-30T12:00:00.000Z');
     expect(parsed['state']).toEqual(state);
     expect(content).not.toContain('NX200_PROCEDURES');
+    expect(content).not.toContain('nx200-owner-manual-pending');
+    expect(content).not.toContain('spec-engine-oil-grade');
   });
 
   it('omits reconstructible demonstration services from the exported state', () => {

@@ -24,6 +24,10 @@ suportada.
 - modo oficina, Wake Lock opcional e temporizador manual por horário de término;
 - registro opcional de manutenção após a conclusão, com vínculo individual à execução;
 - especificações não confirmadas marcadas como **A confirmar**;
+- catálogo editorial com fontes, claims, citações, aplicabilidade e revisões;
+- transparência em `/technical-sources`, filtros por sistema, estado e aplicabilidade;
+- versionamento editorial e risco separados da dificuldade dos procedimentos;
+- detecção automática de conflitos e validação bloqueante do conteúdo;
 - estado local no schema 3, migração encadeada dos formatos anteriores e recuperação segura;
 - exportação e importação de backup JSON com validação, resumo e confirmação;
 - navegação responsiva, PWA instalável e service worker de produção;
@@ -46,6 +50,7 @@ Acesse o endereço informado pelo Angular CLI. O aplicativo redireciona a raiz p
 ```bash
 npm run lint
 npm run test:ci
+npm run validate:content
 npm run build
 ```
 
@@ -90,19 +95,26 @@ etapa. O backup é a forma disponível de transferir dados entre navegadores ou 
 
 ## Dados técnicos
 
-Os intervalos do plano inicial são demonstrativos. Itens com fonte `needs-confirmation`
-permanecem visíveis para orientar a estrutura, mas não geram prioridades operacionais.
-Nenhum valor mecânico específico não confirmado é apresentado como fato. Valores técnicos
-sem documentação confiável aparecem como **A confirmar** e mantêm o campo de fonte técnica.
-Os checklists continuam utilizáveis, mas sua conclusão não afirma que a motocicleta está segura
-nem transforma conteúdo pendente em recomendação operacional.
+O catálogo técnico é estático e separado dos dados pessoais. Ele estrutura documentos,
+citações localizadas, aplicabilidade por ano/mercado/variante, claims, revisões, conflitos e
+revisões editoriais dos procedimentos. Nada disso entra no `GarageState` ou no backup.
+
+Nenhum manual, PDF ou transcrição técnica real está presente no repositório. Os quatro registros
+de fonte atuais identificam apenas materiais necessários e têm disponibilidade `unavailable`.
+Consequentemente, todas as claims permanecem `demonstrative`, com valor **A confirmar**, sem
+citação ou revisão e sem uso operacional. Os intervalos demonstrativos do plano continuam
+inativos em alertas.
+
+`npm run validate:content` verifica IDs, referências, páginas, aplicabilidade, revisões,
+conflitos, supersessões e compatibilidade do catálogo. O comando não altera arquivos e falha se
+encontrar uma violação bloqueante.
 
 ## Estrutura
 
 ```text
 src/app/
 ├── core/      # modelos, domínio, serviços e armazenamento
-├── data/      # conteúdo demonstrativo da Honda NX200
+├── data/      # catálogo editorial estático e dados demonstrativos da Honda NX200
 ├── features/  # páginas e shell de navegação
 └── shared/    # componentes reutilizáveis
 ```
@@ -110,3 +122,6 @@ src/app/
 Consulte [docs/architecture.md](docs/architecture.md) para decisões técnicas,
 [docs/product-vision.md](docs/product-vision.md) para o recorte do produto e
 [docs/content-guidelines.md](docs/content-guidelines.md) antes de adicionar conteúdo mecânico.
+O processo editorial está em [docs/technical-source-ingestion.md](docs/technical-source-ingestion.md),
+a política de revisão em [docs/technical-review-policy.md](docs/technical-review-policy.md) e o
+estado das variantes em [docs/nx200-supported-variants.md](docs/nx200-supported-variants.md).

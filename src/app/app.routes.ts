@@ -101,6 +101,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'technical-sources',
+        title: 'Fontes técnicas | Garage',
+        loadComponent: () =>
+          import('./features/technical-sources/technical-sources-page').then(
+            (component) => component.TechnicalSourcesPage,
+          ),
+      },
+      {
         path: 'settings',
         title: 'Ajustes | Garage',
         loadComponent: () =>

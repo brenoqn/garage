@@ -41,15 +41,31 @@
 - [x] backup schema 3 com importação compatível do schema 2;
 - [x] testes de domínio, store, migração, catálogo, componentes e Wake Lock.
 
+## Sprint 4 — base técnica verificável
+
+- [x] fontes documentais estruturadas por tipo, disponibilidade e metadados;
+- [x] citações localizadas, aplicabilidade e revisão técnica versionada;
+- [x] claims com valores estruturados e estados editoriais explícitos;
+- [x] detecção de conflitos, supersessão inválida e confirmação indevida;
+- [x] catálogo NX200 dividido em fontes, claims, especificações, plano e procedimentos;
+- [x] preservação dos slugs e IDs usados por execuções do schema 3;
+- [x] versionamento editorial e risco dos seis procedimentos;
+- [x] transparência de fontes e filtros nas especificações;
+- [x] validador executável por `npm run validate:content`;
+- [x] documentação de ingestão, revisão e variantes;
+- [x] nenhum valor confirmado sem documentação suficiente.
+
 ## Próximas iterações
 
-### Sprint 4 recomendada — conteúdo técnico validado
+### Sprint 5 recomendada — primeiro conteúdo tecnicamente validado
 
-- obter documentação técnica licenciada e confiável;
-- associar valores confirmados por ano-modelo e mercado;
-- revisar procedimentos com profissional qualificado;
-- produzir o primeiro procedimento tecnicamente completo;
-- adicionar imagens próprias ou licenciadas somente após revisão.
+- obter legalmente manual do proprietário, manual de serviço e catálogo aplicáveis;
+- identificar ano de fabricação, ano-modelo, mercado, variante e código do motor da moto alvo;
+- selecionar bateria ou vela como primeiro domínio de menor risco;
+- transcrever somente claims localizadas por página ou seção;
+- registrar revisão profissional e resolver divergências;
+- publicar o primeiro procedimento confirmado somente quando todos os critérios passarem;
+- produzir imagens próprias ou licenciadas após a revisão do conteúdo.
 
 ### Experiência
 

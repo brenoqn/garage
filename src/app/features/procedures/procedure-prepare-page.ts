@@ -1,6 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormControl, FormRecord, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import {
+  procedureNeedsEnhancedWarning,
+  technicalStatusLabel,
+} from '../../core/domain/technical-content';
 import { selectActiveProcedureExecution } from '../../core/domain/procedure-execution';
 import { GarageStore } from '../../core/services/garage-store.service';
 
@@ -18,6 +22,30 @@ import { GarageStore } from '../../core/services/garage-store.service';
             <p>Confira o ambiente, reúna os itens e reconheça cada alerta antes de começar.</p>
           </div>
         </header>
+
+        <section
+          class="card editorial-summary compact"
+          aria-label="Estado editorial do procedimento"
+        >
+          <div class="technical-claim-heading">
+            <div>
+              <p class="eyebrow">Conteúdo versão {{ guide.editorialRevision.version }}</p>
+              <h2>{{ statusLabel() }}</h2>
+            </div>
+            <span class="editorial-badge" [attr.data-status]="guide.editorialRevision.status">
+              {{ statusLabel() }}
+            </span>
+          </div>
+          <p>{{ guide.editorialRevision.summary }}</p>
+          <p>
+            <strong>Aplicabilidade:</strong> ano, mercado e variante ainda precisam ser confirmados.
+          </p>
+          <p>
+            <strong>Valores:</strong> {{ confirmedClaimCount() }} confirmados ·
+            {{ pendingClaimCount() }} pendentes.
+          </p>
+          <a class="text-button" routerLink="/technical-sources">Ver fontes técnicas</a>
+        </section>
 
         @if (!store.setup().completed || store.recovery()) {
           <section class="recovery-banner" role="alert">
@@ -90,6 +118,23 @@ import { GarageStore } from '../../core/services/garage-store.service';
             </section>
           }
 
+          @if (needsEnhancedWarning()) {
+            <section class="safety-card critical-content-warning" role="alert">
+              <span class="safety-icon" aria-hidden="true">!</span>
+              <div>
+                <h2>
+                  Risco {{ guide.riskLevel === 'critical' ? 'crítico' : 'alto' }} com conteúdo
+                  pendente
+                </h2>
+                <p>{{ guide.riskNote }}</p>
+                <p>
+                  O checklist serve somente como apoio educacional. A conclusão não certifica a
+                  segurança ou a correção mecânica da motocicleta.
+                </p>
+              </div>
+            </section>
+          }
+
           @if (hasPendingTechnicalValues()) {
             <p class="source-warning compact" role="note">
               <span aria-hidden="true">i</span>
@@ -149,8 +194,28 @@ export class ProcedurePreparePage {
       : undefined;
   });
   protected readonly warningControls = new FormRecord<FormControl<boolean>>({});
+  protected readonly technicalClaims = computed(() => {
+    const procedure = this.procedure();
+    if (!procedure) return [];
+    const byId = new Map(this.store.technicalClaims().map((claim) => [claim.id, claim]));
+    return procedure.technicalClaimIds.flatMap((claimId) => {
+      const claim = byId.get(claimId);
+      return claim ? [claim] : [];
+    });
+  });
   protected readonly hasPendingTechnicalValues = computed(() =>
-    this.procedure()?.technicalValues.some((item) => item.source.status === 'needs-confirmation'),
+    this.technicalClaims().some((claim) => claim.status !== 'confirmed'),
+  );
+  protected readonly confirmedClaimCount = computed(
+    () => this.technicalClaims().filter((claim) => claim.status === 'confirmed').length,
+  );
+  protected readonly pendingClaimCount = computed(
+    () => this.technicalClaims().filter((claim) => claim.status !== 'confirmed').length,
+  );
+  protected readonly needsEnhancedWarning = computed(() =>
+    this.procedure()
+      ? procedureNeedsEnhancedWarning(this.procedure()!.riskLevel, this.technicalClaims())
+      : false,
   );
 
   constructor() {
@@ -181,5 +246,9 @@ export class ProcedurePreparePage {
       !this.activeExecution() &&
       Object.values(this.warningControls.getRawValue()).every(Boolean)
     );
+  }
+
+  protected statusLabel(): string {
+    return technicalStatusLabel(this.procedure()?.editorialRevision.status ?? 'demonstrative');
   }
 }

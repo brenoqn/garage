@@ -43,6 +43,17 @@ import { ScreenWakeLockService } from '../../core/services/screen-wake-lock.serv
               }
             </header>
 
+            <div class="run-technical-reference">
+              <span>
+                Conteúdo
+                {{
+                  guide.editorialRevision.status === 'confirmed' ? 'confirmado' : 'demonstrativo'
+                }}
+                · versão {{ guide.editorialRevision.version }}
+              </span>
+              <a class="text-button" routerLink="/technical-sources">Ver fonte técnica</a>
+            </div>
+
             <section
               class="run-progress"
               aria-labelledby="progress-title"
@@ -207,9 +218,10 @@ import { ScreenWakeLockService } from '../../core/services/screen-wake-lock.serv
                           </span>
                         </label>
                       }
-                      @if (guide.difficulty === 'advanced') {
+                      @if (guide.riskLevel === 'high' || guide.riskLevel === 'critical') {
                         <p class="source-warning compact">
-                          Concluir este checklist não certifica a segurança mecânica do sistema.
+                          Checklist concluído não significa validação técnica nem certifica a
+                          segurança mecânica do sistema.
                         </p>
                       }
                       <details class="relevant-warnings">

@@ -58,4 +58,24 @@ describe('ProcedurePreparePage', () => {
       expect.any(String),
     ]);
   });
+
+  it('shows editorial version and an explicit warning for critical pending content', async () => {
+    const procedure = NX200_PROCEDURES.find((item) => item.slug === 'inspecao-dos-freios')!;
+    await TestBed.configureTestingModule({
+      imports: [ProcedurePreparePage],
+      providers: [
+        provideRouter([]),
+        { provide: LocalStorageAdapter, useValue: new MemoryStorage() },
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { paramMap: convertToParamMap({ slug: procedure.slug }) } },
+        },
+      ],
+    }).compileComponents();
+    const fixture = TestBed.createComponent(ProcedurePreparePage);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Conteúdo versão 1');
+    expect(fixture.nativeElement.textContent).toContain('Risco crítico com conteúdo pendente');
+    expect(fixture.nativeElement.textContent).toContain('não certifica');
+  });
 });

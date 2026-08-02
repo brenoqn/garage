@@ -1,0 +1,47 @@
+import { GarageState } from '../../core/models/garage-state.model';
+import { NX200_MAINTENANCE_PLAN } from './maintenance-plan/nx200-maintenance-plan.data';
+
+export const INITIAL_GARAGE_STATE: GarageState = {
+  schemaVersion: 3,
+  motorcycle: {
+    id: 'nx200-primary',
+    manufacturer: 'Honda',
+    model: 'NX200',
+    nickname: 'Minha NX',
+    year: 1997,
+    currentMileage: 28750,
+    createdAt: '2026-01-10T10:00:00.000Z',
+    updatedAt: '2026-07-28T10:00:00.000Z',
+  },
+  maintenancePlan: NX200_MAINTENANCE_PLAN,
+  serviceHistory: [
+    {
+      id: 'demo-chain',
+      title: 'Limpeza e lubrificação da corrente',
+      date: '2026-07-08',
+      mileage: 27800,
+      procedureSlug: 'ajuste-lubrificacao-corrente',
+      maintenancePlanId: 'drive-chain',
+      parts: [{ name: 'Lubrificante para corrente', quantity: 1 }],
+      notes: 'Tensão conferida visualmente; valor técnico ainda precisa ser validado.',
+      createdAt: '2026-07-08T14:00:00.000Z',
+      isDemo: true,
+    },
+    {
+      id: 'demo-oil',
+      title: 'Troca do óleo do motor',
+      date: '2026-05-12',
+      mileage: 26400,
+      procedureSlug: 'troca-de-oleo',
+      maintenancePlanId: 'engine-oil',
+      cost: 82.5,
+      parts: [{ name: 'Óleo do motor', quantity: 1 }],
+      createdAt: '2026-05-12T14:00:00.000Z',
+      isDemo: true,
+    },
+  ],
+  odometerHistory: [],
+  procedureExecutions: [],
+  settings: { maintenanceAlertsEnabled: true },
+  setup: { completed: false, demoData: true },
+};
