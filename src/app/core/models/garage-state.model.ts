@@ -1,6 +1,7 @@
 import { MaintenancePlanItem } from './maintenance.model';
 import { Motorcycle } from './motorcycle.model';
 import { OdometerRecord } from './odometer-record.model';
+import { ProcedureExecution } from './procedure-execution.model';
 import { ServiceRecord } from './service-record.model';
 
 export interface GarageSettings {
@@ -13,11 +14,12 @@ export interface GarageSetup {
 }
 
 export interface GarageState {
-  readonly schemaVersion: 2;
+  readonly schemaVersion: 3;
   readonly motorcycle: Motorcycle;
   readonly maintenancePlan: readonly MaintenancePlanItem[];
   readonly serviceHistory: readonly ServiceRecord[];
   readonly odometerHistory: readonly OdometerRecord[];
+  readonly procedureExecutions: readonly ProcedureExecution[];
   readonly settings: GarageSettings;
   readonly setup: GarageSetup;
 }

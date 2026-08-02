@@ -117,6 +117,10 @@ import { GarageStore } from '../../core/services/garage-store.service';
                 <dt>Itens do plano</dt>
                 <dd>{{ summary.maintenanceItems }}</dd>
               </div>
+              <div>
+                <dt>Atividades de procedimentos</dt>
+                <dd>{{ summary.procedureExecutions }}</dd>
+              </div>
             </dl>
             <div class="confirm-box" role="alert">
               <strong>Substituir todos os dados atuais?</strong>
@@ -243,7 +247,7 @@ export class SettingsPage {
       this.importError.set('Não foi possível ler o arquivo selecionado.');
       return;
     }
-    const result = parseGarageBackup(content);
+    const result = parseGarageBackup(content, this.store.procedures());
     if (!result.ok) {
       this.importError.set(result.error);
       return;

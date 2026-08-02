@@ -2,7 +2,7 @@ import { GarageState } from './garage-state.model';
 
 export interface GarageBackup {
   readonly product: 'garage';
-  readonly schemaVersion: 2;
+  readonly schemaVersion: 3;
   readonly exportedAt: string;
   readonly state: GarageState;
 }
@@ -14,6 +14,7 @@ export interface GarageBackupSummary {
   readonly serviceRecords: number;
   readonly odometerRecords: number;
   readonly maintenanceItems: number;
+  readonly procedureExecutions: number;
 }
 
 export type GarageBackupParseResult =

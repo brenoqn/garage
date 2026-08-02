@@ -40,8 +40,19 @@ Todo procedimento deve conter:
 9. erros comuns;
 10. verificações finais.
 
+Etapas, alertas, verificações, ferramentas e materiais possuem IDs estáveis usados pelo estado
+persistido. Alterar texto ou tradução não deve alterar o ID. Remover ou trocar um ID exige uma
+migração capaz de preservar execuções existentes.
+
 Use verbos de ação e uma tarefa por etapa. Explique quando parar e procurar um profissional.
 Não diga que um procedimento é seguro sem apresentar condições e riscos.
+Um checklist pode ser concluído com valores `needs-confirmation`, mas a interface deve informar
+que a validação técnica permanece pendente. Para sistemas críticos, use linguagem de inspeção e
+nunca frases como “moto segura”, “freio aprovado” ou equivalentes.
+
+A conclusão do procedimento registra apenas que o usuário percorreu o checklist. Ela não cria
+um serviço, não confirma a execução mecânica e não substitui avaliação profissional. Imagens
+futuras precisam de licença e referência; nenhuma imagem mecânica faz parte da Sprint 3.
 
 ## Linguagem
 

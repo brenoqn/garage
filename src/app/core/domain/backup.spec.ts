@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { NX200_PROCEDURES } from '../../data/nx200-demo.data';
 import { GarageState } from '../models/garage-state.model';
 import { createGarageBackup, parseGarageBackup } from './backup';
 
 const state: GarageState = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   motorcycle: {
     id: 'nx200-primary',
     manufacturer: 'Honda',
@@ -17,17 +18,17 @@ const state: GarageState = {
   maintenancePlan: [],
   serviceHistory: [],
   odometerHistory: [],
+  procedureExecutions: [],
   settings: { maintenanceAlertsEnabled: true },
   setup: { completed: true, demoData: false },
 };
 
 describe('Garage backup', () => {
-  it('exports a versioned envelope with all user state', () => {
+  it('exports schema 3 with every user-owned collection', () => {
     const content = createGarageBackup(state, '2026-07-30T12:00:00.000Z');
     const parsed = JSON.parse(content) as Record<string, unknown>;
-
     expect(parsed['product']).toBe('garage');
-    expect(parsed['schemaVersion']).toBe(2);
+    expect(parsed['schemaVersion']).toBe(3);
     expect(parsed['exportedAt']).toBe('2026-07-30T12:00:00.000Z');
     expect(parsed['state']).toEqual(state);
     expect(content).not.toContain('NX200_PROCEDURES');
@@ -43,11 +44,7 @@ describe('Garage backup', () => {
             title: 'Óleo',
             category: 'engine',
             technicalSource: { status: 'needs-confirmation', label: 'Demonstração' },
-            lastExecution: {
-              date: '2026-01-01',
-              mileage: 1_000,
-              serviceRecordId: 'demo-oil',
-            },
+            lastExecution: { date: '2026-01-01', mileage: 1_000, serviceRecordId: 'demo-oil' },
           },
         ],
         serviceHistory: [
@@ -64,8 +61,7 @@ describe('Garage backup', () => {
       },
       '2026-07-30T12:00:00.000Z',
     );
-    const result = parseGarageBackup(content);
-
+    const result = parseGarageBackup(content, NX200_PROCEDURES);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.backup.state.serviceHistory).toEqual([]);
@@ -73,25 +69,53 @@ describe('Garage backup', () => {
     }
   });
 
-  it('validates and summarizes a compatible backup', () => {
-    const result = parseGarageBackup(createGarageBackup(state, '2026-07-30T12:00:00.000Z'));
-
+  it('validates and summarizes execution records', () => {
+    const result = parseGarageBackup(
+      createGarageBackup(state, '2026-07-30T12:00:00.000Z'),
+      NX200_PROCEDURES,
+    );
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.summary.motorcycle).toBe('Honda NX200');
       expect(result.summary.currentMileage).toBe(18_500);
-      expect(result.summary.serviceRecords).toBe(0);
+      expect(result.summary.procedureExecutions).toBe(0);
     }
   });
 
-  it('rejects malformed JSON without side effects', () => {
-    expect(parseGarageBackup('{invalid').ok).toBe(false);
+  it('accepts a valid schema 2 backup and migrates it to schema 3', () => {
+    const legacyState = { ...state, schemaVersion: 2 } as Record<string, unknown>;
+    delete legacyState['procedureExecutions'];
+    const result = parseGarageBackup(
+      JSON.stringify({
+        product: 'garage',
+        schemaVersion: 2,
+        exportedAt: '2026-07-30T12:00:00.000Z',
+        state: legacyState,
+      }),
+      NX200_PROCEDURES,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.backup.schemaVersion).toBe(3);
+      expect(result.backup.state.procedureExecutions).toEqual([]);
+    }
   });
 
-  it('rejects another product or schema version', () => {
+  it('rejects malformed, foreign, future and internally inconsistent backups', () => {
+    expect(parseGarageBackup('{invalid').ok).toBe(false);
     expect(
       parseGarageBackup(
-        JSON.stringify({ product: 'other', schemaVersion: 2, exportedAt: '', state }),
+        JSON.stringify({ product: 'other', schemaVersion: 3, exportedAt: '', state }),
+      ).ok,
+    ).toBe(false);
+    expect(
+      parseGarageBackup(
+        JSON.stringify({
+          product: 'garage',
+          schemaVersion: 99,
+          exportedAt: '2026-07-30T12:00:00.000Z',
+          state,
+        }),
       ).ok,
     ).toBe(false);
     expect(
@@ -100,22 +124,10 @@ describe('Garage backup', () => {
           product: 'garage',
           schemaVersion: 3,
           exportedAt: '2026-07-30T12:00:00.000Z',
-          state,
+          state: { ...state, motorcycle: null },
         }),
+        NX200_PROCEDURES,
       ).ok,
     ).toBe(false);
-  });
-
-  it('rejects a backup whose state does not match schema 2', () => {
-    const result = parseGarageBackup(
-      JSON.stringify({
-        product: 'garage',
-        schemaVersion: 2,
-        exportedAt: '2026-07-30T12:00:00.000Z',
-        state: { ...state, motorcycle: null },
-      }),
-    );
-
-    expect(result.ok).toBe(false);
   });
 });

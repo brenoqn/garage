@@ -1,6 +1,11 @@
 import { GarageBackup, GarageBackupParseResult, GarageBackupSummary } from '../models/backup.model';
 import { GarageState } from '../models/garage-state.model';
-import { validateGarageState } from './garage-state-migration';
+import { Procedure } from '../models/procedure.model';
+import {
+  migrateGarageStateV2,
+  validateGarageState,
+  validateGarageStateV2,
+} from './garage-state-migration';
 
 export function createGarageBackup(state: GarageState, exportedAt: string): string {
   const demoServiceIds = new Set(
@@ -17,10 +22,15 @@ export function createGarageBackup(state: GarageState, exportedAt: string): stri
         ? withoutLastExecution(item)
         : item,
     ),
+    procedureExecutions: state.procedureExecutions.map((execution) =>
+      execution.resultingServiceRecordId && demoServiceIds.has(execution.resultingServiceRecordId)
+        ? withoutResultingService(execution)
+        : execution,
+    ),
   };
   const backup: GarageBackup = {
     product: 'garage',
-    schemaVersion: 2,
+    schemaVersion: 3,
     exportedAt,
     state: backupState,
   };
@@ -35,6 +45,14 @@ function withoutLastExecution(
   return copy;
 }
 
+function withoutResultingService(
+  execution: GarageState['procedureExecutions'][number],
+): GarageState['procedureExecutions'][number] {
+  const copy = { ...execution };
+  delete copy.resultingServiceRecordId;
+  return copy;
+}
+
 export function summarizeGarageBackup(state: GarageState): GarageBackupSummary {
   return {
     motorcycle: `${state.motorcycle.manufacturer} ${state.motorcycle.model}`,
@@ -43,10 +61,14 @@ export function summarizeGarageBackup(state: GarageState): GarageBackupSummary {
     serviceRecords: state.serviceHistory.length,
     odometerRecords: state.odometerHistory.length,
     maintenanceItems: state.maintenancePlan.length,
+    procedureExecutions: state.procedureExecutions.length,
   };
 }
 
-export function parseGarageBackup(content: string): GarageBackupParseResult {
+export function parseGarageBackup(
+  content: string,
+  procedures: readonly Procedure[] = [],
+): GarageBackupParseResult {
   let value: unknown;
   try {
     value = JSON.parse(content);
@@ -62,7 +84,7 @@ export function parseGarageBackup(content: string): GarageBackupParseResult {
   if (candidate['product'] !== 'garage') {
     return { ok: false, error: 'O arquivo não foi identificado como um backup do Garage.' };
   }
-  if (candidate['schemaVersion'] !== 2) {
+  if (candidate['schemaVersion'] !== 2 && candidate['schemaVersion'] !== 3) {
     return {
       ok: false,
       error: 'A versão deste backup é incompatível com esta versão do Garage.',
@@ -75,16 +97,29 @@ export function parseGarageBackup(content: string): GarageBackupParseResult {
     return { ok: false, error: 'A data de exportação do backup é inválida.' };
   }
 
-  const validation = validateGarageState(candidate['state']);
-  if (!validation.valid) {
-    return { ok: false, error: `Backup recusado: ${validation.error}` };
+  const state = parseBackupState(candidate['state'], candidate['schemaVersion'], procedures);
+  if (typeof state === 'string') {
+    return { ok: false, error: `Backup recusado: ${state}` };
   }
 
   const backup: GarageBackup = {
     product: 'garage',
-    schemaVersion: 2,
+    schemaVersion: 3,
     exportedAt: candidate['exportedAt'],
-    state: validation.state,
+    state,
   };
-  return { ok: true, backup, summary: summarizeGarageBackup(validation.state) };
+  return { ok: true, backup, summary: summarizeGarageBackup(state) };
+}
+
+function parseBackupState(
+  value: unknown,
+  schemaVersion: 2 | 3,
+  procedures: readonly Procedure[],
+): GarageState | string {
+  if (schemaVersion === 2) {
+    const validation = validateGarageStateV2(value);
+    return validation.valid ? migrateGarageStateV2(validation.state) : validation.error;
+  }
+  const validation = validateGarageState(value, procedures);
+  return validation.valid ? validation.state : validation.error;
 }

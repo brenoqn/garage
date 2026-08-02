@@ -2,6 +2,8 @@ import { GarageSettings, GarageSetup, GarageState } from '../models/garage-state
 import { MaintenancePlanItem } from '../models/maintenance.model';
 import { Motorcycle } from '../models/motorcycle.model';
 import { OdometerRecord } from '../models/odometer-record.model';
+import { Procedure } from '../models/procedure.model';
+import { ProcedureExecution } from '../models/procedure-execution.model';
 import { ServiceRecord } from '../models/service-record.model';
 
 interface GarageStateV1 {
@@ -12,15 +14,26 @@ interface GarageStateV1 {
   readonly settings: GarageSettings;
 }
 
+export interface GarageStateV2 {
+  readonly schemaVersion: 2;
+  readonly motorcycle: Motorcycle;
+  readonly maintenancePlan: readonly MaintenancePlanItem[];
+  readonly serviceHistory: readonly ServiceRecord[];
+  readonly odometerHistory: readonly OdometerRecord[];
+  readonly settings: GarageSettings;
+  readonly setup: GarageSetup;
+}
+
 export type GarageStateValidation =
   | { readonly valid: true; readonly state: GarageState }
   | { readonly valid: false; readonly error: string };
 
+export type GarageStateV2Validation =
+  | { readonly valid: true; readonly state: GarageStateV2 }
+  | { readonly valid: false; readonly error: string };
+
 export type StoredGarageStateResult =
-  | {
-      readonly kind: 'empty' | 'current' | 'migrated';
-      readonly state: GarageState;
-    }
+  | { readonly kind: 'empty' | 'current' | 'migrated'; readonly state: GarageState }
   | {
       readonly kind: 'invalid-state' | 'future-version';
       readonly state: GarageState;
@@ -100,7 +113,7 @@ function isMotorcycle(value: unknown): value is Motorcycle {
   );
 }
 
-function isExecution(value: unknown): boolean {
+function isMaintenanceExecution(value: unknown): boolean {
   return (
     isRecord(value) &&
     isIsoDate(value['date']) &&
@@ -122,7 +135,7 @@ function isMaintenancePlanItem(value: unknown): value is MaintenancePlanItem {
     isOptionalPositiveInteger(value['intervalDays']) &&
     isOptionalNonNegativeInteger(value['warningKm']) &&
     isOptionalNonNegativeInteger(value['warningDays']) &&
-    (value['lastExecution'] === undefined || isExecution(value['lastExecution'])) &&
+    (value['lastExecution'] === undefined || isMaintenanceExecution(value['lastExecution'])) &&
     isTechnicalSource(value['technicalSource'])
   );
 }
@@ -143,6 +156,7 @@ function isServiceRecord(value: unknown): value is ServiceRecord {
     isIsoDate(value['date']) &&
     isNonNegativeInteger(value['mileage']) &&
     isOptionalString(value['procedureSlug']) &&
+    isOptionalString(value['procedureExecutionId']) &&
     isOptionalString(value['maintenancePlanId']) &&
     isOptionalNonNegativeNumber(value['cost']) &&
     Array.isArray(value['parts']) &&
@@ -176,6 +190,49 @@ function isOdometerRecord(value: unknown): value is OdometerRecord {
   );
 }
 
+function isStringArray(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.every(isNonEmptyString);
+}
+
+function isProcedureExecution(value: unknown): value is ProcedureExecution {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const status = value['status'];
+  const validStatus = status === 'in-progress' || status === 'completed' || status === 'cancelled';
+  if (
+    !isNonEmptyString(value['id']) ||
+    !isNonEmptyString(value['motorcycleId']) ||
+    !isNonEmptyString(value['procedureSlug']) ||
+    !validStatus ||
+    !isIsoTimestamp(value['startedAt']) ||
+    !isIsoTimestamp(value['updatedAt']) ||
+    !isStringArray(value['completedStepIds']) ||
+    !isStringArray(value['completedFinalCheckIds']) ||
+    !isStringArray(value['acknowledgedWarningIds']) ||
+    !isOptionalString(value['currentStepId']) ||
+    !isOptionalString(value['note']) ||
+    !isOptionalString(value['resultingServiceRecordId'])
+  ) {
+    return false;
+  }
+  if (status === 'completed') {
+    return (
+      isIsoTimestamp(value['completedAt']) &&
+      value['cancelledAt'] === undefined &&
+      value['currentStepId'] === undefined
+    );
+  }
+  if (status === 'cancelled') {
+    return (
+      isIsoTimestamp(value['cancelledAt']) &&
+      value['completedAt'] === undefined &&
+      value['currentStepId'] === undefined
+    );
+  }
+  return value['completedAt'] === undefined && value['cancelledAt'] === undefined;
+}
+
 function isSettings(value: unknown): value is GarageSettings {
   return isRecord(value) && typeof value['maintenanceAlertsEnabled'] === 'boolean';
 }
@@ -192,10 +249,12 @@ function hasUniqueIds(values: readonly { readonly id: string }[]): boolean {
   return new Set(values.map((value) => value.id)).size === values.length;
 }
 
-function validateStateFields(value: UnknownRecord, includeV2Fields: boolean): string | null {
-  if (!isMotorcycle(value['motorcycle'])) {
-    return 'Os dados da motocicleta são inválidos.';
-  }
+function hasUniqueStrings(values: readonly string[]): boolean {
+  return new Set(values).size === values.length;
+}
+
+function validateBaseFields(value: UnknownRecord, includeV2Fields: boolean): string | null {
+  if (!isMotorcycle(value['motorcycle'])) return 'Os dados da motocicleta são inválidos.';
   if (
     !Array.isArray(value['maintenancePlan']) ||
     !value['maintenancePlan'].every(isMaintenancePlanItem)
@@ -205,18 +264,13 @@ function validateStateFields(value: UnknownRecord, includeV2Fields: boolean): st
   if (!Array.isArray(value['serviceHistory']) || !value['serviceHistory'].every(isServiceRecord)) {
     return 'O histórico de serviços é inválido.';
   }
-  if (!isSettings(value['settings'])) {
-    return 'As configurações são inválidas.';
-  }
+  if (!isSettings(value['settings'])) return 'As configurações são inválidas.';
 
   const maintenancePlan = value['maintenancePlan'] as readonly MaintenancePlanItem[];
   const serviceHistory = value['serviceHistory'] as readonly ServiceRecord[];
-  if (!hasUniqueIds(maintenancePlan)) {
-    return 'O plano contém identificadores duplicados.';
-  }
-  if (!hasUniqueIds(serviceHistory)) {
+  if (!hasUniqueIds(maintenancePlan)) return 'O plano contém identificadores duplicados.';
+  if (!hasUniqueIds(serviceHistory))
     return 'O histórico de serviços contém identificadores duplicados.';
-  }
   const planIds = new Set(maintenancePlan.map((item) => item.id));
   const serviceIds = new Set(serviceHistory.map((record) => record.id));
   if (
@@ -242,14 +296,11 @@ function validateStateFields(value: UnknownRecord, includeV2Fields: boolean): st
     ) {
       return 'O histórico do odômetro é inválido.';
     }
-    if (!isSetup(value['setup'])) {
-      return 'A configuração inicial é inválida.';
-    }
+    if (!isSetup(value['setup'])) return 'A configuração inicial é inválida.';
     const motorcycle = value['motorcycle'] as Motorcycle;
     const odometerHistory = value['odometerHistory'] as readonly OdometerRecord[];
-    if (!hasUniqueIds(odometerHistory)) {
+    if (!hasUniqueIds(odometerHistory))
       return 'O histórico do odômetro contém identificadores duplicados.';
-    }
     if (odometerHistory.some((record) => record.motorcycleId !== motorcycle.id)) {
       return 'O histórico do odômetro aponta para outra motocicleta.';
     }
@@ -264,19 +315,148 @@ function validateStateFields(value: UnknownRecord, includeV2Fields: boolean): st
   return null;
 }
 
-export function validateGarageState(value: unknown): GarageStateValidation {
+function validateExecutionReferences(
+  value: UnknownRecord,
+  procedures: readonly Procedure[],
+): string | null {
+  if (
+    !Array.isArray(value['procedureExecutions']) ||
+    !value['procedureExecutions'].every(isProcedureExecution)
+  ) {
+    return 'O histórico de procedimentos é inválido.';
+  }
+  const executions = value['procedureExecutions'] as readonly ProcedureExecution[];
+  const services = value['serviceHistory'] as readonly ServiceRecord[];
+  const motorcycle = value['motorcycle'] as Motorcycle;
+  if (!hasUniqueIds(executions))
+    return 'O histórico de procedimentos contém identificadores duplicados.';
+  if (executions.some((execution) => execution.motorcycleId !== motorcycle.id)) {
+    return 'Uma execução de procedimento aponta para outra motocicleta.';
+  }
+  if (
+    executions.some(
+      (execution) =>
+        !hasUniqueStrings(execution.completedStepIds) ||
+        !hasUniqueStrings(execution.completedFinalCheckIds) ||
+        !hasUniqueStrings(execution.acknowledgedWarningIds),
+    )
+  ) {
+    return 'Uma execução de procedimento contém identificadores repetidos.';
+  }
+  const activeKeys = executions
+    .filter((execution) => execution.status === 'in-progress')
+    .map((execution) => `${execution.motorcycleId}:${execution.procedureSlug}`);
+  if (!hasUniqueStrings(activeKeys))
+    return 'Existe mais de uma execução ativa para o mesmo procedimento.';
+
+  const serviceById = new Map(services.map((service) => [service.id, service]));
+  const executionById = new Map(executions.map((execution) => [execution.id, execution]));
+  const linkedExecutionIds = services.flatMap((service) =>
+    service.procedureExecutionId ? [service.procedureExecutionId] : [],
+  );
+  if (!hasUniqueStrings(linkedExecutionIds))
+    return 'Uma execução de procedimento está vinculada a mais de um serviço.';
+  for (const execution of executions) {
+    if (execution.resultingServiceRecordId) {
+      const service = serviceById.get(execution.resultingServiceRecordId);
+      if (
+        !service ||
+        service.procedureExecutionId !== execution.id ||
+        execution.status !== 'completed'
+      ) {
+        return 'Uma execução de procedimento possui um vínculo de serviço inconsistente.';
+      }
+    }
+  }
+  for (const service of services) {
+    if (service.procedureExecutionId) {
+      const execution = executionById.get(service.procedureExecutionId);
+      if (
+        !execution ||
+        execution.resultingServiceRecordId !== service.id ||
+        execution.status !== 'completed' ||
+        service.procedureSlug !== execution.procedureSlug
+      ) {
+        return 'Um serviço possui um vínculo de procedimento inconsistente.';
+      }
+    }
+  }
+
+  if (procedures.length > 0) {
+    const procedureBySlug = new Map(procedures.map((procedure) => [procedure.slug, procedure]));
+    for (const execution of executions) {
+      const procedure = procedureBySlug.get(execution.procedureSlug);
+      if (!procedure) return 'Uma execução aponta para um procedimento inexistente.';
+      const stepIds = new Set(procedure.steps.map((step) => step.id));
+      const warningIds = new Set(procedure.safetyWarnings.map((warning) => warning.id));
+      const checkIds = new Set(procedure.finalChecks.map((check) => check.id));
+      if (
+        execution.completedStepIds.some((id) => !stepIds.has(id)) ||
+        (execution.currentStepId && !stepIds.has(execution.currentStepId))
+      ) {
+        return 'Uma execução aponta para uma etapa inexistente.';
+      }
+      if (execution.acknowledgedWarningIds.some((id) => !warningIds.has(id))) {
+        return 'Uma execução aponta para um alerta de segurança inexistente.';
+      }
+      if (
+        procedure.safetyWarnings.some(
+          (warning) => !execution.acknowledgedWarningIds.includes(warning.id),
+        )
+      ) {
+        return 'Uma execução não registra todos os alertas de segurança reconhecidos.';
+      }
+      if (execution.completedFinalCheckIds.some((id) => !checkIds.has(id))) {
+        return 'Uma execução aponta para uma verificação final inexistente.';
+      }
+      if (
+        execution.status === 'completed' &&
+        (procedure.steps
+          .filter((step) => step.required)
+          .some((step) => !execution.completedStepIds.includes(step.id)) ||
+          procedure.finalChecks
+            .filter((check) => check.required)
+            .some((check) => !execution.completedFinalCheckIds.includes(check.id)))
+      ) {
+        return 'Uma execução concluída não possui todos os itens obrigatórios.';
+      }
+    }
+  }
+  return null;
+}
+
+export function validateGarageStateV2(value: unknown): GarageStateV2Validation {
   if (!isRecord(value) || value['schemaVersion'] !== 2) {
     return { valid: false, error: 'O estado não usa o schema 2 do Garage.' };
   }
-  const error = validateStateFields(value, true);
+  const error =
+    validateBaseFields(value, true) ??
+    ((value['serviceHistory'] as readonly ServiceRecord[]).some(
+      (record) => record.procedureExecutionId !== undefined,
+    )
+      ? 'O schema 2 não suporta vínculos com execuções de procedimentos.'
+      : null);
+  return error
+    ? { valid: false, error }
+    : { valid: true, state: value as unknown as GarageStateV2 };
+}
+
+export function validateGarageState(
+  value: unknown,
+  procedures: readonly Procedure[] = [],
+): GarageStateValidation {
+  if (!isRecord(value) || value['schemaVersion'] !== 3) {
+    return { valid: false, error: 'O estado não usa o schema 3 do Garage.' };
+  }
+  const error = validateBaseFields(value, true) ?? validateExecutionReferences(value, procedures);
   return error ? { valid: false, error } : { valid: true, state: value as unknown as GarageState };
 }
 
 function isGarageStateV1(value: unknown): value is GarageStateV1 {
-  return isRecord(value) && value['version'] === 1 && validateStateFields(value, false) === null;
+  return isRecord(value) && value['version'] === 1 && validateBaseFields(value, false) === null;
 }
 
-export function migrateGarageStateV1(value: GarageStateV1): GarageState {
+function migrateGarageStateV1ToV2(value: GarageStateV1): GarageStateV2 {
   const migrationRecord: OdometerRecord = {
     id: `odometer-migration-${value.motorcycle.id}`,
     motorcycleId: value.motorcycle.id,
@@ -285,7 +465,6 @@ export function migrateGarageStateV1(value: GarageStateV1): GarageState {
     source: 'migration',
     note: 'Leitura preservada durante a migração do schema 1. Confirme na configuração inicial.',
   };
-
   return {
     schemaVersion: 2,
     motorcycle: value.motorcycle,
@@ -295,21 +474,24 @@ export function migrateGarageStateV1(value: GarageStateV1): GarageState {
     ),
     odometerHistory: [migrationRecord],
     settings: value.settings,
-    setup: {
-      completed: false,
-      demoData: true,
-    },
+    setup: { completed: false, demoData: true },
   };
+}
+
+export function migrateGarageStateV2(value: GarageStateV2): GarageState {
+  return { ...value, schemaVersion: 3, procedureExecutions: [] };
+}
+
+export function migrateGarageStateV1(value: GarageStateV1): GarageState {
+  return migrateGarageStateV2(migrateGarageStateV1ToV2(value));
 }
 
 export function decodeStoredGarageState(
   rawValue: string | null,
   safeState: GarageState,
+  procedures: readonly Procedure[] = [],
 ): StoredGarageStateResult {
-  if (rawValue === null) {
-    return { kind: 'empty', state: safeState };
-  }
-
+  if (rawValue === null) return { kind: 'empty', state: safeState };
   let parsed: unknown;
   try {
     parsed = JSON.parse(rawValue);
@@ -323,7 +505,7 @@ export function decodeStoredGarageState(
   }
 
   if (isRecord(parsed) && typeof parsed['schemaVersion'] === 'number') {
-    if (parsed['schemaVersion'] > 2) {
+    if (parsed['schemaVersion'] > 3) {
       return {
         kind: 'future-version',
         state: safeState,
@@ -332,7 +514,18 @@ export function decodeStoredGarageState(
           'Os dados foram criados por uma versão mais recente do Garage e não foram substituídos.',
       };
     }
-    const validation = validateGarageState(parsed);
+    if (parsed['schemaVersion'] === 2) {
+      const validation = validateGarageStateV2(parsed);
+      return validation.valid
+        ? { kind: 'migrated', state: migrateGarageStateV2(validation.state) }
+        : {
+            kind: 'invalid-state',
+            state: safeState,
+            rawValue,
+            message: `${validation.error} O conteúdo original foi preservado.`,
+          };
+    }
+    const validation = validateGarageState(parsed, procedures);
     return validation.valid
       ? { kind: 'current', state: validation.state }
       : {
@@ -343,10 +536,7 @@ export function decodeStoredGarageState(
         };
   }
 
-  if (isGarageStateV1(parsed)) {
-    return { kind: 'migrated', state: migrateGarageStateV1(parsed) };
-  }
-
+  if (isGarageStateV1(parsed)) return { kind: 'migrated', state: migrateGarageStateV1(parsed) };
   return {
     kind: 'invalid-state',
     state: safeState,

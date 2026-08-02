@@ -18,6 +18,12 @@ import { GarageStore } from '../../core/services/garage-store.service';
             Vincule ao plano para recalcular a próxima ocorrência quando este for o serviço mais
             recente.
           </p>
+          @if (procedureExecution) {
+            <p class="success-message" role="status">
+              Esta manutenção será vinculada à execução concluída do procedimento. Nada será
+              registrado até você salvar este formulário.
+            </p>
+          }
         </div>
       </header>
 
@@ -160,13 +166,35 @@ export class NewServicePage {
   private readonly formBuilder = inject(FormBuilder);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly initialPlanId = this.route.snapshot.queryParamMap.get('plan') ?? '';
-  private readonly initialProcedureSlug = this.route.snapshot.queryParamMap.get('procedure') ?? '';
+  private readonly initialExecutionId = this.route.snapshot.queryParamMap.get('execution') ?? '';
+  protected readonly procedureExecution = this.store
+    .procedureExecutions()
+    .find(
+      (execution) =>
+        execution.id === this.initialExecutionId &&
+        execution.status === 'completed' &&
+        !execution.resultingServiceRecordId,
+    );
+  private readonly initialProcedureSlug =
+    this.procedureExecution?.procedureSlug ??
+    this.route.snapshot.queryParamMap.get('procedure') ??
+    '';
+  private readonly initialPlanId =
+    this.route.snapshot.queryParamMap.get('plan') ??
+    this.store.maintenancePlan().find((item) => item.procedureSlug === this.initialProcedureSlug)
+      ?.id ??
+    '';
+  private readonly initialTitle =
+    this.store.procedures().find((procedure) => procedure.slug === this.initialProcedureSlug)
+      ?.title ?? '';
 
   protected readonly today = todayIso();
   protected readonly saveError = signal('');
   protected readonly form = this.formBuilder.nonNullable.group({
-    title: ['', [Validators.required, Validators.maxLength(80), Validators.pattern(/.*\S.*/)]],
+    title: [
+      this.initialTitle,
+      [Validators.required, Validators.maxLength(80), Validators.pattern(/.*\S.*/)],
+    ],
     date: [this.today, Validators.required],
     mileage: [
       this.store.motorcycle().currentMileage,
@@ -181,6 +209,9 @@ export class NewServicePage {
 
   constructor() {
     this.applyPlanDefaults();
+    if (this.procedureExecution) {
+      this.form.controls.procedureSlug.disable();
+    }
   }
 
   protected applyPlanDefaults(): void {
@@ -210,6 +241,7 @@ export class NewServicePage {
       mileage: value.mileage,
       maintenancePlanId: value.maintenancePlanId || undefined,
       procedureSlug: value.procedureSlug || undefined,
+      procedureExecutionId: this.procedureExecution?.id,
       cost: value.cost ?? undefined,
       parts: value.parts
         .split(',')

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { selectActiveProcedureExecution } from '../../core/domain/procedure-execution';
 import { ProcedureDifficulty } from '../../core/models/procedure.model';
 import { GarageStore } from '../../core/services/garage-store.service';
 
@@ -33,6 +34,21 @@ import { GarageStore } from '../../core/services/garage-store.service';
           </div>
         </header>
 
+        @if (activeExecution(); as active) {
+          <section class="card active-execution-card">
+            <div>
+              <p class="eyebrow">Em andamento</p>
+              <h2>Continue de onde parou</h2>
+              <p>Seu progresso está salvo neste dispositivo.</p>
+            </div>
+            <a
+              class="button button-primary"
+              [routerLink]="['/procedures', guide.slug, 'run', active.id]"
+              >Continuar execução</a
+            >
+          </section>
+        }
+
         <div class="procedure-layout">
           <div class="procedure-main">
             <section class="safety-card" aria-labelledby="safety-title">
@@ -40,8 +56,8 @@ import { GarageStore } from '../../core/services/garage-store.service';
               <div>
                 <h2 id="safety-title">Antes de começar</h2>
                 <ul>
-                  @for (warning of guide.safetyWarnings; track warning) {
-                    <li>{{ warning }}</li>
+                  @for (warning of guide.safetyWarnings; track warning.id) {
+                    <li>{{ warning.text }}</li>
                   }
                 </ul>
               </div>
@@ -55,7 +71,7 @@ import { GarageStore } from '../../core/services/garage-store.service';
                 </div>
               </div>
               <ol class="step-list">
-                @for (step of guide.steps; track step.title; let index = $index) {
+                @for (step of guide.steps; track step.id; let index = $index) {
                   <li>
                     <span class="step-number">{{ index + 1 }}</span>
                     <div>
@@ -80,16 +96,19 @@ import { GarageStore } from '../../core/services/garage-store.service';
               <div class="technical-table">
                 @for (item of guide.technicalValues; track item.label) {
                   <div>
-                    <span>{{ item.label }}</span>
-                    <strong>{{ item.value }}</strong>
-                    <small>Fonte: {{ item.source.label }}</small>
+                    <span>{{ item.label }}</span
+                    ><strong>{{ item.value }}</strong
+                    ><small>Fonte: {{ item.source.label }}</small>
                   </div>
                 }
               </div>
               <p class="source-warning compact">
-                <span aria-hidden="true">i</span>
-                Valores não confirmados nunca devem ser usados como instrução mecânica.
+                <span aria-hidden="true">i</span>Valores não confirmados nunca devem ser usados como
+                instrução mecânica.
               </p>
+              @if (guide.contentNote) {
+                <p class="settings-footnote">{{ guide.contentNote }}</p>
+              }
             </section>
 
             <div class="guide-two-column">
@@ -104,8 +123,8 @@ import { GarageStore } from '../../core/services/garage-store.service';
               <section class="card guide-section small">
                 <h2>Verificações finais</h2>
                 <ul class="check-list">
-                  @for (check of guide.finalChecks; track check) {
-                    <li><span aria-hidden="true">✓</span>{{ check }}</li>
+                  @for (check of guide.finalChecks; track check.id) {
+                    <li><span aria-hidden="true">✓</span>{{ check.label }}</li>
                   }
                 </ul>
               </section>
@@ -116,32 +135,40 @@ import { GarageStore } from '../../core/services/garage-store.service';
             <section class="card">
               <h2>Ferramentas</h2>
               <ul class="plain-list">
-                @for (tool of guide.tools; track tool) {
-                  <li><span aria-hidden="true">◇</span>{{ tool }}</li>
+                @for (tool of guide.tools; track tool.id) {
+                  <li><span aria-hidden="true">◇</span>{{ tool.name }}</li>
                 }
               </ul>
             </section>
             <section class="card">
               <h2>Materiais</h2>
               <ul class="plain-list">
-                @for (material of guide.materials; track material) {
-                  <li><span aria-hidden="true">□</span>{{ material }}</li>
+                @for (material of guide.materials; track material.id) {
+                  <li><span aria-hidden="true">□</span>{{ material.name }}</li>
                 }
               </ul>
             </section>
-            <a
-              class="button button-primary button-full"
-              routerLink="/maintenance/new"
-              [queryParams]="{ procedure: guide.slug }"
+            @if (activeExecution(); as active) {
+              <a
+                class="button button-primary button-full"
+                [routerLink]="['/procedures', guide.slug, 'run', active.id]"
+                >Continuar execução</a
+              >
+            } @else {
+              <a
+                class="button button-primary button-full"
+                [routerLink]="['/procedures', guide.slug, 'prepare']"
+                >Começar procedimento</a
+              >
+            }
+            <a class="button button-secondary button-full" routerLink="/procedure-executions"
+              >Ver atividades</a
             >
-              Registrar este serviço
-            </a>
           </aside>
         </div>
       } @else {
         <div class="empty-state">
-          <span aria-hidden="true">?</span>
-          <strong>Procedimento não encontrado</strong>
+          <span aria-hidden="true">?</span><strong>Procedimento não encontrado</strong>
           <p>Este guia não existe ou ainda não está disponível.</p>
           <a class="button button-primary" routerLink="/procedures">Ver todos os guias</a>
         </div>
@@ -158,7 +185,16 @@ export class ProcedureDetailPage {
       .procedures()
       .find((candidate) => candidate.slug === this.route.snapshot.paramMap.get('slug')),
   );
-
+  protected readonly activeExecution = computed(() => {
+    const procedure = this.procedure();
+    return procedure
+      ? selectActiveProcedureExecution(
+          this.store.procedureExecutions(),
+          this.store.motorcycle().id,
+          procedure.slug,
+        )
+      : undefined;
+  });
   protected difficultyLabel(difficulty: ProcedureDifficulty): string {
     return { easy: 'Fácil', moderate: 'Moderada', advanced: 'Avançada' }[difficulty];
   }

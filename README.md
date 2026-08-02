@@ -2,7 +2,7 @@
 
 Garage é um aplicativo web progressivo, mobile-first e autodidático para proprietários de
 motocicletas. Este MVP atende exclusivamente à Honda NX200 e oferece manutenção preventiva,
-procedimentos guiados, histórico de serviços, histórico do odômetro e alertas internos.
+procedimentos interativos, histórico de serviços, histórico do odômetro e alertas internos.
 
 O nome do produto é **Garage**. “Honda NX200” identifica somente a primeira motocicleta
 suportada.
@@ -18,12 +18,16 @@ suportada.
 - intervalos sem fonte confirmada visíveis, porém inativos nas contagens e nos alertas;
 - registro cronológico de serviços, peças, custos e observações;
 - atualização da referência do plano somente quando o serviço vinculado é mais recente;
-- biblioteca pesquisável com seis procedimentos demonstrativos;
+- biblioteca pesquisável com seis procedimentos demonstrativos e IDs estáveis;
+- preparação com confirmação de segurança, execução passo a passo e retomada local;
+- histórico de procedimentos em andamento, concluídos e cancelados;
+- modo oficina, Wake Lock opcional e temporizador manual por horário de término;
+- registro opcional de manutenção após a conclusão, com vínculo individual à execução;
 - especificações não confirmadas marcadas como **A confirmar**;
-- estado local no schema 2, migração do formato anterior e recuperação segura de estado inválido;
+- estado local no schema 3, migração encadeada dos formatos anteriores e recuperação segura;
 - exportação e importação de backup JSON com validação, resumo e confirmação;
 - navegação responsiva, PWA instalável e service worker de produção;
-- testes unitários das regras de domínio, migração, backup, odômetro e cronologia.
+- testes de domínio, store, migração, backup, procedimentos, componentes e Wake Lock.
 
 ## Executar localmente
 
@@ -55,10 +59,10 @@ npm run build:sites
 
 ## Persistência, migração e backup
 
-O `LocalStorage` guarda diretamente um `GarageState` com `schemaVersion: 2` na chave física
-`garage_state`. O formato anterior, identificado por `version: 1`, é validado e migrado de
-forma idempotente. A migração preserva motocicleta, plano, serviços e preferências e cria a
-primeira referência do histórico do odômetro.
+O `LocalStorage` guarda diretamente um `GarageState` com `schemaVersion: 3` na chave física
+`garage_state`. Estados do schema 2 recebem `procedureExecutions: []` sem mudança nos demais
+campos. O formato `version: 1` percorre a cadeia v1 → v2 → v3. Cada etapa é validada, a
+migração é idempotente e o conteúdo anterior é preservado.
 
 Se o valor local for inválido ou pertencer a uma versão futura, ele não é sobrescrito. O
 Garage inicia um estado demonstrativo somente em memória, informa o problema e permite
@@ -70,16 +74,16 @@ O backup usa um envelope separado:
 ```json
 {
   "product": "garage",
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "exportedAt": "2026-07-30T12:00:00.000Z",
   "state": {}
 }
 ```
 
-Procedimentos e especificações são conteúdo estático da aplicação e não são acrescentados ao
-backup. O plano preventivo permanece no estado porque contém referências de execução criadas
-pelos registros do usuário. Serviços marcados como demonstração e suas referências também são
-removidos da cópia exportada.
+Procedimentos e especificações são conteúdo estático e não entram no backup. Execuções de
+procedimentos, seus vínculos com serviços, plano, odômetro e demais dados do usuário entram.
+Backups do schema 2 são aceitos e migrados; schema 3 é validado diretamente; versões futuras
+são recusadas. Serviços demonstrativos reconstruíveis e suas referências são removidos.
 
 O aplicativo não possui backend, conta de usuário, sincronização ou notificações push nesta
 etapa. O backup é a forma disponível de transferir dados entre navegadores ou dispositivos.
@@ -90,6 +94,8 @@ Os intervalos do plano inicial são demonstrativos. Itens com fonte `needs-confi
 permanecem visíveis para orientar a estrutura, mas não geram prioridades operacionais.
 Nenhum valor mecânico específico não confirmado é apresentado como fato. Valores técnicos
 sem documentação confiável aparecem como **A confirmar** e mantêm o campo de fonte técnica.
+Os checklists continuam utilizáveis, mas sua conclusão não afirma que a motocicleta está segura
+nem transforma conteúdo pendente em recomendação operacional.
 
 ## Estrutura
 

@@ -55,7 +55,7 @@ describe('GarageStore', () => {
     );
   });
 
-  it('records each odometer update and persists schema 2', () => {
+  it('records each odometer update and persists schema 3', () => {
     const result = store.updateMileage({
       mileage: 31_000,
       source: 'dashboard',
@@ -69,7 +69,7 @@ describe('GarageStore', () => {
       source: 'dashboard',
       note: 'Leitura no abastecimento',
     });
-    expect(storage.get<GarageState>('state')?.schemaVersion).toBe(2);
+    expect(storage.get<GarageState>('state')?.schemaVersion).toBe(3);
   });
 
   it('does not lower mileage until the regression is explicitly confirmed', () => {
@@ -191,6 +191,7 @@ describe('GarageStore', () => {
     delete legacyData['schemaVersion'];
     delete legacyData['odometerHistory'];
     delete legacyData['setup'];
+    delete legacyData['procedureExecutions'];
     legacyStorage.setRaw('state', JSON.stringify({ version: 1, ...legacyData }));
     TestBed.configureTestingModule({
       providers: [GarageStore, { provide: LocalStorageAdapter, useValue: legacyStorage }],
@@ -198,9 +199,9 @@ describe('GarageStore', () => {
 
     const migratedStore = TestBed.inject(GarageStore);
     const persisted = legacyStorage.get<Record<string, unknown>>('state');
-    expect(migratedStore.state().schemaVersion).toBe(2);
+    expect(migratedStore.state().schemaVersion).toBe(3);
     expect(migratedStore.motorcycle()).toEqual(INITIAL_GARAGE_STATE.motorcycle);
-    expect(persisted?.['schemaVersion']).toBe(2);
+    expect(persisted?.['schemaVersion']).toBe(3);
     expect(persisted?.['version']).toBeUndefined();
   });
 
@@ -215,6 +216,96 @@ describe('GarageStore', () => {
 
     expect(recoveredStore.importState(INITIAL_GARAGE_STATE)).toBe(true);
     expect(recoveredStore.recovery()).toBeUndefined();
-    expect(invalidStorage.get<GarageState>('state')?.schemaVersion).toBe(2);
+    expect(invalidStorage.get<GarageState>('state')?.schemaVersion).toBe(3);
+  });
+
+  it('persists procedure progress and resumes it after recreating the store', () => {
+    const procedure = store.procedures()[0]!;
+    const started = store.startProcedure(
+      procedure.slug,
+      procedure.safetyWarnings.map((warning) => warning.id),
+    );
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+    expect(store.completeProcedureStep(started.execution.id, procedure.steps[0]!.id).ok).toBe(true);
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [GarageStore, { provide: LocalStorageAdapter, useValue: storage }],
+    });
+    const resumedStore = TestBed.inject(GarageStore);
+    expect(resumedStore.activeProcedureExecutions()[0]).toMatchObject({
+      id: started.execution.id,
+      completedStepIds: [procedure.steps[0]!.id],
+    });
+  });
+
+  it('allows only one active execution of the same procedure and rolls back failed writes', () => {
+    const procedure = store.procedures()[0]!;
+    const warnings = procedure.safetyWarnings.map((warning) => warning.id);
+    const started = store.startProcedure(procedure.slug, warnings);
+    expect(started.ok).toBe(true);
+    expect(store.startProcedure(procedure.slug, warnings).ok).toBe(false);
+    if (!started.ok) return;
+
+    storage.failWrites = true;
+    expect(store.completeProcedureStep(started.execution.id, procedure.steps[0]!.id).ok).toBe(
+      false,
+    );
+    expect(store.procedureExecutions()[0]?.completedStepIds).toEqual([]);
+  });
+
+  it('links one completed execution to one service in the same persisted state', () => {
+    const procedure = store.procedures()[0]!;
+    const started = store.startProcedure(
+      procedure.slug,
+      procedure.safetyWarnings.map((warning) => warning.id),
+    );
+    if (!started.ok) throw new Error(started.error);
+    for (const step of procedure.steps.filter((candidate) => candidate.required)) {
+      expect(store.completeProcedureStep(started.execution.id, step.id).ok).toBe(true);
+    }
+    for (const check of procedure.finalChecks.filter((candidate) => candidate.required)) {
+      expect(store.setProcedureFinalCheck(started.execution.id, check.id, true).ok).toBe(true);
+    }
+    expect(store.finishProcedure(started.execution.id).ok).toBe(true);
+    const service = store.addService({
+      title: procedure.title,
+      date: '2026-08-01',
+      mileage: store.motorcycle().currentMileage,
+      procedureSlug: procedure.slug,
+      procedureExecutionId: started.execution.id,
+      parts: [],
+    });
+    expect(service).not.toBeNull();
+    expect(
+      store.procedureExecutions().find((item) => item.id === started.execution.id)
+        ?.resultingServiceRecordId,
+    ).toBe(service?.id);
+    expect(
+      store.addService({
+        title: 'Duplicado',
+        date: '2026-08-01',
+        mileage: store.motorcycle().currentMileage,
+        procedureSlug: procedure.slug,
+        procedureExecutionId: started.execution.id,
+        parts: [],
+      }),
+    ).toBeNull();
+  });
+
+  it('cancels an execution without changing the plan, odometer or service history', () => {
+    const procedure = store.procedures()[0]!;
+    const before = store.state();
+    const started = store.startProcedure(
+      procedure.slug,
+      procedure.safetyWarnings.map((warning) => warning.id),
+    );
+    if (!started.ok) throw new Error(started.error);
+    expect(store.cancelProcedure(started.execution.id).ok).toBe(true);
+    expect(store.procedureExecutions()[0]?.status).toBe('cancelled');
+    expect(store.motorcycle().currentMileage).toBe(before.motorcycle.currentMileage);
+    expect(store.maintenancePlan()).toEqual(before.maintenancePlan);
+    expect(store.serviceHistory()).toEqual(before.serviceHistory);
   });
 });

@@ -7,6 +7,7 @@ import {
   InAppNotificationService,
   NOTIFICATION_SERVICE,
 } from './core/services/notification.service';
+import { browserWakeLockFactory, SCREEN_WAKE_LOCK } from './core/services/screen-wake-lock.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -20,5 +21,6 @@ export const appConfig: ApplicationConfig = {
       provide: NOTIFICATION_SERVICE,
       useClass: InAppNotificationService,
     },
+    { provide: SCREEN_WAKE_LOCK, useFactory: browserWakeLockFactory },
   ],
 };

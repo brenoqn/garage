@@ -21,12 +21,14 @@ técnica oficial.
 - dados armazenados no dispositivo, com migração e backup;
 - histórico de serviços e leituras do odômetro;
 - plano preventivo com intervalos não confirmados inativos;
-- seis procedimentos demonstrativos;
+- seis procedimentos demonstrativos com preparação e execução interativa;
+- progresso local, retomada, modo oficina e histórico de atividades;
+- registro opcional de manutenção depois da conclusão;
 - alertas dentro do aplicativo;
 - modo claro e instalação como PWA.
 
 Não fazem parte desta etapa: outras motos, backend, autenticação, sincronização, colaboração,
-notificações push, checklists de execução, compra de peças ou diagnósticos automatizados.
+notificações push, compra de peças, diagnósticos automatizados ou conteúdo mecânico sem revisão.
 
 ## Princípios de experiência
 
@@ -37,9 +39,11 @@ notificações push, checklists de execução, compra de peças ou diagnósticos
 - **Controle do usuário:** importações e reduções do odômetro exigem confirmação explícita.
 - **Histórico imutável:** correções atuais não reescrevem serviços ou leituras antigas.
 - **Uso na oficina:** controles grandes, contraste e leitura rápida em telas pequenas.
+- **Progresso sob controle:** pausar preserva a execução; cancelar ou reiniciar exige confirmação.
+- **Separação de intenções:** concluir um guia não registra manutenção nem atesta segurança.
 
 ## Métricas futuras
 
 Quando houver telemetria consentida, avaliar: conclusão da configuração, atualizações de
-quilometragem, serviços registrados, backups concluídos e instalações da PWA. Não há coleta de
-telemetria neste MVP.
+quilometragem, procedimentos iniciados e concluídos, serviços registrados, backups concluídos e
+instalações da PWA. Não há coleta de telemetria neste MVP.

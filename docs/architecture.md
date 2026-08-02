@@ -2,161 +2,155 @@
 
 ## Visão geral
 
-Garage é uma aplicação Angular 22 standalone, estrita e sem backend. As rotas são carregadas
-sob demanda dentro de um shell responsivo. Signals mantêm o estado local; formulários reativos
-tratam configuração, registros e confirmações.
+Garage é uma PWA Angular 22 standalone, estrita e sem backend. Rotas lazy são exibidas em um
+shell responsivo. Signals representam o estado local e formulários reativos tratam entradas e
+confirmações.
 
 ```text
 UI / rotas
     ↓
-GarageStore + NotificationService + CurrentDateService
+GarageStore + serviços de navegador
     ↓
-regras puras: migração, backup, odômetro, cronologia e manutenção
+regras puras: execução, migração, backup, odômetro, cronologia e manutenção
     ↓
 StoragePort
     ↓
 LocalStorageAdapter (`garage_state`)
 ```
 
-## Limites de pastas
-
-- `core/models`: contratos do domínio, estado persistido e backup.
-- `core/domain`: cálculos, validações e migrações puras, sem Angular ou navegador.
-- `core/storage`: porta de armazenamento e implementação LocalStorage.
-- `core/services`: coordenação de estado, persistência, data atual e alertas.
-- `shared`: componentes pequenos reutilizados entre recursos.
-- `features`: páginas standalone organizadas por fluxo.
-- `data`: estado inicial, procedimentos e especificações demonstrativas.
+`core/models` define contratos; `core/domain` contém regras e validações sem Angular;
+`core/services` coordena estado e APIs opcionais; `core/storage` isola o LocalStorage;
+`features` contém páginas standalone; `data` mantém o catálogo estático da Honda NX200; e
+`shared` abriga componentes reutilizáveis.
 
 ## Estado persistido
 
-O `GarageStore` possui um Signal privado com `GarageState`. O `LocalStorage` guarda diretamente
-o schema atual, sem envelope e sem duplicidade de campos de versão:
+O valor em `garage_state` é diretamente o agregado, sem envelope adicional:
 
 ```typescript
 interface GarageState {
-  schemaVersion: 2;
+  schemaVersion: 3;
   motorcycle: Motorcycle;
   maintenancePlan: readonly MaintenancePlanItem[];
   serviceHistory: readonly ServiceRecord[];
   odometerHistory: readonly OdometerRecord[];
+  procedureExecutions: readonly ProcedureExecution[];
   settings: GarageSettings;
   setup: GarageSetup;
 }
 ```
 
-`setup.completed` separa dados operacionais de uma demonstração ainda não confirmada.
-`setup.demoData` permite que a interface explique a origem do estado. O seed usa Honda NX200
-ano 1997 e não ativa alertas antes da configuração.
+O catálogo de procedimentos e as especificações continuam estáticos e reconstruíveis. O estado
+persiste apenas dados do usuário e referências a IDs estáveis do catálogo. A validação de runtime
+recusa IDs desconhecidos, duplicados, vínculos quebrados e mais de uma execução ativa do mesmo
+procedimento para a mesma motocicleta.
 
-Procedimentos e especificações continuam como conteúdo estático da aplicação e não são
-persistidos. O plano é persistido porque `lastExecution` contém referências produzidas pelo
-histórico do usuário. Os serviços do seed são marcados como demonstração, permanecem
-identificados na interface e não entram no backup; registros não demonstrativos são preservados.
+## Migração e recuperação
 
-## Carregamento, migração e recuperação
+`decodeStoredGarageState` diferencia:
 
-`decodeStoredGarageState` recebe o texto bruto e produz um dos resultados:
+- `empty`: usa o seed do schema 3;
+- `current`: aceita um schema 3 validado;
+- `migrated`: valida v2 e acrescenta somente `procedureExecutions: []`, ou percorre v1 → v2 → v3;
+- `invalid-state`: preserva o valor bruto e usa o seed somente em memória;
+- `future-version`: preserva uma versão que o aplicativo atual não conhece.
 
-- `empty`: usa o seed do schema 2;
-- `current`: aceita um estado 2 validado;
-- `migrated`: valida o formato `version: 1` e produz diretamente `GarageState` 2;
-- `invalid-state`: preserva o valor bruto e usa o seed apenas em memória;
-- `future-version`: preserva dados que esta versão não sabe interpretar.
+A transformação v2 → v3 preserva motocicleta, plano, serviços, odômetro, preferências e setup.
+Depois da primeira gravação, decodificar o resultado não aplica outra transformação. Estado
+inválido ou futuro nunca é substituído automaticamente; somente importação ou restauração
+confirmada libera o modo de recuperação.
 
-A migração é idempotente: um estado já migrado é validado e devolvido sem nova transformação.
-O formato legado mantém motocicleta, plano, serviços e preferências. Uma leitura de odômetro
-com origem `migration` registra a quilometragem encontrada, enquanto o setup permanece
-pendente para o usuário confirmá-la.
+## Execuções de procedimentos
 
-Estados inválidos ou futuros colocam o store em modo de recuperação. Alterações comuns ficam
-bloqueadas, o conteúdo bruto pode ser exportado, e somente importação ou restauração
-explicitamente confirmada substitui `garage_state`.
+`ProcedureExecution` registra `in-progress`, `completed` ou `cancelled`, timestamps, IDs de
+etapas concluídas, verificações finais, alertas reconhecidos, etapa atual, observação e serviço
+resultante opcional.
 
-## Persistência transacional
+O ciclo de vida é:
 
-Mutações constroem o próximo estado, serializam-no pela `StoragePort` e apenas depois atualizam
-o Signal. Se a gravação falhar, a interface continua com o estado anterior e o store expõe um
-problema de persistência. Essa ordem evita apresentar como salvo algo que o navegador recusou.
+```text
+preparação → in-progress ── concluir requisitos ──→ completed ── ação do usuário ──→ serviço
+                 │
+                 ├── pausar → permanece in-progress
+                 ├── cancelar → cancelled
+                 └── reiniciar → cancelled + nova in-progress com outro ID
+```
 
-`LocalStorageAdapter` continua sendo a única implementação. IndexedDB, backend e sincronização
-permanecem fora desta etapa.
+Existe no máximo uma execução `in-progress` por motocicleta e slug. O percentual principal usa
+somente etapas obrigatórias. Etapas opcionais têm contagem separada e não bloqueiam a conclusão.
+Finalizar exige todas as etapas e verificações finais obrigatórias. Desmarcar uma etapa não apaga
+etapas posteriores.
+
+As funções em `core/domain/procedure-execution.ts` criam, avançam, desmarcam, calculam progresso,
+concluem, cancelam, reiniciam, selecionam a ativa e vinculam serviços. Componentes apenas
+coordenam interação e apresentação.
+
+## Persistência transacional e vínculo com serviços
+
+Cada mutação constrói e valida o próximo `GarageState`, grava pela `StoragePort` e somente depois
+publica o novo Signal. Falha de gravação preserva a interface anterior e bloqueia novas mudanças
+até recuperação.
+
+Concluir um procedimento não altera plano, odômetro nem histórico de serviços. A tela concluída
+oferece abrir o formulário. Ao salvar, `ServiceRecord.procedureExecutionId` e
+`ProcedureExecution.resultingServiceRecordId` são escritos na mesma transação. A validação exige
+relação bidirecional, slug compatível, execução concluída e cardinalidade um-para-um. Plano e
+odômetro seguem as regras cronológicas da Sprint 2.
 
 ## Backup
 
-O envelope existe somente no arquivo exportado:
+O envelope existe somente no arquivo:
 
 ```typescript
 interface GarageBackup {
   product: 'garage';
-  schemaVersion: 2;
+  schemaVersion: 3;
   exportedAt: string;
   state: GarageState;
 }
 ```
 
-`parseGarageBackup` analisa o JSON, verifica produto, versão, data e todos os campos do estado,
-e então produz um resumo. A seleção do arquivo não altera o store. A UI exige uma segunda ação
-para confirmar a substituição. Arquivos malformados, de outro produto ou schema incompatível
-são recusados.
+O backup inclui execuções e vínculos, mas não o catálogo estático. A importação aceita schema 2,
+migra-o para 3, aceita schema 3 validado e recusa versões futuras. O resumo inclui quantidade de
+execuções. Selecionar o arquivo não muda o store; uma confirmação separada substitui os dados.
 
-## Odômetro
+## Catálogo e integridade
 
-Cada atualização cria um `OdometerRecord` com motocicleta, quilometragem, instante, origem e
-observação opcional. Uma leitura inferior retorna `confirmation-required` sem efeitos. Depois
-da confirmação, a origem deve ser `correction` ou `panel-replacement`; o novo registro é
-acrescentado e históricos antigos permanecem imutáveis.
+Etapas, alertas, verificações, ferramentas e materiais são estruturados e possuem IDs explícitos
+que não dependem de posição ou texto. Testes garantem slugs e IDs únicos, não vazios e referências
+válidas. Campos para imagens futuras existem, mas nenhuma imagem mecânica foi adicionada.
 
-Todo serviço cria uma leitura com origem `service`. Serviços com quilometragem menor continuam
-no histórico, mas não reduzem a leitura atual da motocicleta.
+Todo valor técnico atual permanece `needs-confirmation` e `A confirmar`. Checklists avançados
+podem ser concluídos, mas a interface não afirma segurança ou aprovação mecânica.
 
-## Cronologia de serviços
+## Modo oficina, temporizador e Wake Lock
 
-`shouldReplaceMaintenanceExecution` decide se um serviço vinculado passa a ser
-`lastExecution`:
+O modo oficina cobre o shell com uma interface vertical simplificada e controles maiores. A
+preferência não é persistida. `ScreenWakeLockService` isola a API Wake Lock: solicita após a ação
+explícita, trata ausência ou recusa sem bloquear o fluxo, libera ao sair e tenta readquirir quando
+a aba volta visível enquanto a solicitação continua ativa.
 
-1. data posterior vence;
-2. em datas iguais, maior quilometragem vence;
-3. data e quilometragem iguais preservam a execução atual.
+O temporizador é manual, opcional e não contém durações técnicas no catálogo. O usuário informa
+minutos; o restante deriva de um timestamp de término, suporta pausa e cancelamento e não precisa
+sobreviver ao fechamento completo do navegador.
 
-O histórico visível usa a mesma ordem, com `createdAt` apenas como desempate final.
+## Odômetro, plano e alertas
 
-## Regra de manutenção
+Leituras regressivas continuam exigindo confirmação e motivo; serviços antigos não reduzem o
+odômetro atual. `shouldReplaceMaintenanceExecution` mantém a referência cronologicamente mais
+recente do plano. Itens `needs-confirmation` retornam `unknown` e não entram em alertas ou
+contagens. Notificações push continuam fora do escopo.
 
-`calculateMaintenanceSchedule` recebe item, quilometragem atual e data de referência. Um item
-com fonte `needs-confirmation` retorna `unknown` antes de qualquer cálculo. Para fontes
-confirmadas, quilometragem e tempo são calculados separadamente e prevalece o estado mais
-urgente:
+## PWA e hospedagem estática
 
-```text
-overdue > due > upcoming > ok > unknown
-```
+O Angular Service Worker é ativado em produção, guarda shell e assets, e sustenta a navegação
+básica offline. O manifesto usa **Garage** e inicia em `/dashboard`. `npm run build:sites` prepara
+`dist/client` e um Worker estático com fallback para as rotas Angular.
 
-Enquanto o setup estiver incompleto, todas as linhas são apresentadas como pendentes e as
-contagens operacionais permanecem zeradas.
+## Limitações atuais
 
-## Alertas
-
-`InAppNotificationService` converte somente itens operacionais em alertas, acrescenta razão,
-previsões, dias/quilômetros restantes ou em atraso e a ação principal. Alertas são ordenados
-por urgência. `CurrentDateService` atualiza o dia de referência após a meia-noite, permitindo
-que estados por calendário mudem sem outra ação do usuário.
-
-Notificações push continuam atrás da interface `NotificationService` e fora do escopo.
-
-## PWA
-
-O Angular Service Worker é ativado apenas em produção por `app.config.ts`. `ngsw-config.json`
-faz cache do shell e dos assets. O manifesto usa o nome **Garage**, inicia em `/dashboard` e
-contém ícones maskable originais.
-
-`npm run build:sites` organiza o bundle em `dist/client` e gera o Worker estático em
-`dist/server/index.js`, com fallback para `index.html` nas rotas do Angular.
-
-## Decisões e compromissos
-
-- Um agregado `GarageState` mantém consistência offline no escopo de uma motocicleta.
-- O schema local e o envelope de backup têm papéis diferentes e não são aninhados.
-- O conteúdo técnico não confirmado continua visível, mas é inativo operacionalmente.
-- O armazenamento não é criptografado e pertence ao dispositivo/navegador.
-- Checklists de procedimentos foram adiados para a Sprint 3, sobre a persistência estabilizada.
+- um navegador, uma Honda NX200 e LocalStorage sem criptografia ou sincronização;
+- conteúdo mecânico demonstrativo ainda sem validação documental;
+- temporizadores não persistem após fechar completamente o navegador;
+- Wake Lock depende de suporte e permissão do navegador;
+- sem imagens, anexos, exclusão de execuções, push, backend ou autenticação.

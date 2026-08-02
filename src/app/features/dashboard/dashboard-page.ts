@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { calculateMaintenanceSchedule } from '../../core/domain/maintenance-calculator';
+import { calculateProcedureProgress } from '../../core/domain/procedure-execution';
+import { ProcedureExecution } from '../../core/models/procedure-execution.model';
 import { MaintenancePlanItem, MaintenanceSchedule } from '../../core/models/maintenance.model';
 import { OdometerRecordSource } from '../../core/models/odometer-record.model';
 import { CurrentDateService } from '../../core/services/current-date.service';
@@ -242,6 +244,49 @@ const urgency = { overdue: 5, due: 4, upcoming: 3, ok: 2, unknown: 1 } as const;
         </div>
       </section>
 
+      @if (store.activeProcedureExecutions().length || recentProcedureExecutions().length) {
+        <section class="section-block procedure-activity-summary">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Oficina</p>
+              <h2>Atividades de procedimentos</h2>
+            </div>
+            <a routerLink="/procedure-executions">Ver todas</a>
+          </div>
+          <div class="activity-grid compact-grid">
+            @for (execution of store.activeProcedureExecutions().slice(0, 2); track execution.id) {
+              <article class="card activity-card">
+                <span class="execution-status in-progress">Em andamento</span>
+                <h3>{{ procedureTitle(execution.procedureSlug) }}</h3>
+                <p>
+                  {{ activityProgress(execution) }}% · atualizada em
+                  {{ formatActivityDate(execution.updatedAt) }}
+                </p>
+                <a
+                  class="button button-primary"
+                  [routerLink]="['/procedures', execution.procedureSlug, 'run', execution.id]"
+                  >Continuar</a
+                >
+              </article>
+            }
+            @for (execution of recentProcedureExecutions().slice(0, 2); track execution.id) {
+              <article class="card activity-card">
+                <span [class]="'execution-status ' + execution.status">{{
+                  execution.status === 'completed' ? 'Concluído' : 'Cancelado'
+                }}</span>
+                <h3>{{ procedureTitle(execution.procedureSlug) }}</h3>
+                <p>{{ formatActivityDate(execution.updatedAt) }}</p>
+                <a
+                  class="button button-secondary"
+                  [routerLink]="['/procedure-executions', execution.id]"
+                  >Detalhes</a
+                >
+              </article>
+            }
+          </div>
+        </section>
+      }
+
       <section class="section-block">
         <div class="section-heading">
           <div>
@@ -307,6 +352,9 @@ export class DashboardPage {
   });
   protected readonly lastService = computed(() =>
     this.store.serviceHistory().find((service) => !service.isDemo),
+  );
+  protected readonly recentProcedureExecutions = computed(() =>
+    this.store.procedureExecutions().filter((execution) => execution.status !== 'in-progress'),
   );
   protected readonly schedules = computed<readonly ScheduleRow[]>(() =>
     this.store.maintenancePlan().map((item) => ({
@@ -401,6 +449,23 @@ export class DashboardPage {
       year: 'numeric',
       timeZone: 'UTC',
     }).format(new Date(`${value}T12:00:00Z`));
+  }
+
+  protected procedureTitle(slug: string): string {
+    return this.store.procedures().find((procedure) => procedure.slug === slug)?.title ?? slug;
+  }
+
+  protected formatActivityDate(value: string): string {
+    return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(
+      new Date(value),
+    );
+  }
+
+  protected activityProgress(execution: ProcedureExecution): number {
+    const procedure = this.store
+      .procedures()
+      .find((candidate) => candidate.slug === execution.procedureSlug);
+    return procedure ? calculateProcedureProgress(procedure, execution).percent : 0;
   }
 
   protected scheduleDescription(schedule: MaintenanceSchedule): string {

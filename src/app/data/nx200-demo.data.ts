@@ -23,6 +23,10 @@ const technicalValue = (label: string) => ({
   source: procedureSource,
 });
 
+const resource = (id: string, name: string) => ({ id, name });
+const warning = (id: string, text: string) => ({ id, text });
+const finalCheck = (id: string, label: string) => ({ id, label, required: true });
+
 export const NX200_MAINTENANCE_PLAN: readonly MaintenancePlanItem[] = [
   {
     id: 'engine-oil',
@@ -91,7 +95,7 @@ export const NX200_MAINTENANCE_PLAN: readonly MaintenancePlanItem[] = [
 ];
 
 export const INITIAL_GARAGE_STATE: GarageState = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   motorcycle: {
     id: 'nx200-primary',
     manufacturer: 'Honda',
@@ -130,6 +134,7 @@ export const INITIAL_GARAGE_STATE: GarageState = {
     },
   ],
   odometerHistory: [],
+  procedureExecutions: [],
   settings: {
     maintenanceAlertsEnabled: true,
   },
@@ -148,33 +153,57 @@ export const NX200_PROCEDURES: readonly Procedure[] = [
       'Roteiro guiado para drenar o óleo usado, revisar a vedação e completar o motor com o produto correto.',
     difficulty: 'moderate',
     estimatedMinutes: 45,
-    tools: ['Recipiente coletor', 'Chave compatível', 'Funil', 'Torquímetro, se disponível'],
-    materials: ['Óleo especificado para a motocicleta', 'Arruela de vedação, se necessário'],
+    tools: [
+      resource('oil-tool-collector', 'Recipiente coletor'),
+      resource('oil-tool-wrench', 'Chave compatível'),
+      resource('oil-tool-funnel', 'Funil'),
+      resource('oil-tool-torque', 'Torquímetro, se disponível'),
+    ],
+    materials: [
+      resource('oil-material-oil', 'Óleo especificado para a motocicleta'),
+      resource('oil-material-seal', 'Arruela de vedação, se necessário'),
+    ],
     safetyWarnings: [
-      'Trabalhe com a motocicleta estável, em local ventilado e com o motor apenas morno.',
-      'Óleo usado deve ser entregue a um ponto de coleta; nunca descarte no solo ou ralo.',
+      warning(
+        'oil-warning-stability',
+        'Trabalhe com a motocicleta estável, em local ventilado e com o motor apenas morno.',
+      ),
+      warning(
+        'oil-warning-disposal',
+        'Óleo usado deve ser entregue a um ponto de coleta; nunca descarte no solo ou ralo.',
+      ),
     ],
     steps: [
       {
+        id: 'oil-step-prepare',
         title: 'Prepare a área',
         description: 'Estabilize a moto e posicione o recipiente coletor.',
+        required: true,
       },
       {
+        id: 'oil-step-drain',
         title: 'Drene o óleo',
         description: 'Abra o ponto de abastecimento e remova o bujão de drenagem com cuidado.',
+        required: true,
         safetyNote: 'Use luvas e evite contato com óleo quente.',
       },
       {
+        id: 'oil-step-seal',
         title: 'Inspecione a vedação',
         description: 'Limpe o bujão e verifique a arruela antes da reinstalação.',
+        required: true,
       },
       {
+        id: 'oil-step-refill',
         title: 'Reabasteça',
         description: 'Aplique o torque e o volume somente após confirmá-los em fonte técnica.',
+        required: true,
       },
       {
+        id: 'oil-step-level',
         title: 'Confira o nível',
         description: 'Siga o método de medição indicado na documentação e procure vazamentos.',
+        required: true,
       },
     ],
     technicalValues: [
@@ -187,7 +216,12 @@ export const NX200_PROCEDURES: readonly Procedure[] = [
       'Reutilizar uma vedação danificada.',
       'Aplicar torque sem confirmar o valor.',
     ],
-    finalChecks: ['Nível correto', 'Ausência de vazamentos', 'Bujão e tampa firmes'],
+    finalChecks: [
+      finalCheck('oil-check-level', 'Nível conferido conforme documentação aplicável'),
+      finalCheck('oil-check-leaks', 'Ausência de vazamentos aparentes'),
+      finalCheck('oil-check-fasteners', 'Bujão e tampa conferidos'),
+    ],
+    contentNote: 'Checklist demonstrativo — valores técnicos permanecem pendentes de validação.',
   },
   {
     slug: 'ajuste-lubrificacao-corrente',
@@ -197,24 +231,56 @@ export const NX200_PROCEDURES: readonly Procedure[] = [
       'Inspeção da transmissão final, limpeza cuidadosa, lubrificação e conferência do alinhamento.',
     difficulty: 'moderate',
     estimatedMinutes: 40,
-    tools: ['Escova própria para corrente', 'Chaves compatíveis', 'Régua ou medidor'],
-    materials: ['Limpador compatível', 'Lubrificante para corrente'],
+    tools: [
+      resource('chain-tool-brush', 'Escova própria para corrente'),
+      resource('chain-tool-wrenches', 'Chaves compatíveis'),
+      resource('chain-tool-ruler', 'Régua ou medidor'),
+    ],
+    materials: [
+      resource('chain-material-cleaner', 'Limpador compatível'),
+      resource('chain-material-lubricant', 'Lubrificante para corrente'),
+    ],
     safetyWarnings: [
-      'Desligue o motor e nunca gire a roda com o motor em funcionamento durante o serviço.',
-      'Mantenha dedos, roupas e ferramentas longe dos pontos de esmagamento.',
+      warning(
+        'chain-warning-engine-off',
+        'Desligue o motor e nunca gire a roda com o motor em funcionamento durante o serviço.',
+      ),
+      warning(
+        'chain-warning-pinch',
+        'Mantenha dedos, roupas e ferramentas longe dos pontos de esmagamento.',
+      ),
     ],
     steps: [
-      { title: 'Inspecione', description: 'Procure elos presos, danos e desgaste irregular.' },
-      { title: 'Limpe', description: 'Remova a sujeira com produto e escova adequados.' },
       {
+        id: 'chain-step-inspect',
+        title: 'Inspecione',
+        description: 'Procure elos presos, danos e desgaste irregular.',
+        required: true,
+      },
+      {
+        id: 'chain-step-clean',
+        title: 'Limpe',
+        description: 'Remova a sujeira com produto e escova adequados.',
+        required: true,
+      },
+      {
+        id: 'chain-step-measure',
         title: 'Meça a folga',
         description: 'Meça no ponto indicado pelo manual e compare somente com o valor confirmado.',
+        required: true,
       },
       {
+        id: 'chain-step-align',
         title: 'Ajuste e alinhe',
         description: 'Faça ajustes iguais nos dois lados e confirme o alinhamento da roda.',
+        required: true,
       },
-      { title: 'Lubrifique', description: 'Aplique uma camada uniforme e retire o excesso.' },
+      {
+        id: 'chain-step-lubricate',
+        title: 'Lubrifique',
+        description: 'Aplique uma camada uniforme e retire o excesso.',
+        required: true,
+      },
     ],
     technicalValues: [
       technicalValue('Folga da corrente'),
@@ -227,11 +293,12 @@ export const NX200_PROCEDURES: readonly Procedure[] = [
       'Lubrificar sobre sujeira acumulada.',
     ],
     finalChecks: [
-      'Folga uniforme',
-      'Roda alinhada',
-      'Fixadores conferidos',
-      'Sem excesso de produto',
+      finalCheck('chain-check-slack', 'Folga conferida conforme documentação aplicável'),
+      finalCheck('chain-check-alignment', 'Roda alinhada'),
+      finalCheck('chain-check-fasteners', 'Fixadores conferidos'),
+      finalCheck('chain-check-excess', 'Sem excesso aparente de produto'),
     ],
+    contentNote: 'Checklist demonstrativo — valores técnicos permanecem pendentes de validação.',
   },
   {
     slug: 'inspecao-da-vela',
@@ -241,26 +308,48 @@ export const NX200_PROCEDURES: readonly Procedure[] = [
       'Remoção, leitura visual e reinstalação segura da vela de ignição, sem assumir medidas não confirmadas.',
     difficulty: 'moderate',
     estimatedMinutes: 30,
-    tools: ['Chave de vela compatível', 'Calibrador de lâminas', 'Ar comprimido, se disponível'],
-    materials: ['Pano limpo', 'Vela de reposição correta, se necessária'],
-    safetyWarnings: ['Espere o motor esfriar antes de remover a vela.'],
+    tools: [
+      resource('spark-tool-wrench', 'Chave de vela compatível'),
+      resource('spark-tool-gauge', 'Calibrador de lâminas'),
+      resource('spark-tool-air', 'Ar comprimido, se disponível'),
+    ],
+    materials: [
+      resource('spark-material-cloth', 'Pano limpo'),
+      resource('spark-material-replacement', 'Vela de reposição correta, se necessária'),
+    ],
+    safetyWarnings: [
+      warning('spark-warning-cool', 'Espere o motor esfriar antes de remover a vela.'),
+    ],
     steps: [
-      { title: 'Limpe a área', description: 'Remova a sujeira ao redor antes de soltar a vela.' },
       {
+        id: 'spark-step-clean',
+        title: 'Limpe a área',
+        description: 'Remova a sujeira ao redor antes de soltar a vela.',
+        required: true,
+      },
+      {
+        id: 'spark-step-remove',
         title: 'Remova',
         description: 'Retire o cachimbo e desrosqueie sem aplicar força lateral.',
+        required: true,
       },
       {
+        id: 'spark-step-inspect',
         title: 'Inspecione',
         description: 'Observe eletrodos, isolador, depósitos e sinais de dano.',
+        required: true,
       },
       {
+        id: 'spark-step-gap',
         title: 'Confirme a folga',
         description: 'Meça a abertura e compare com a documentação técnica correta.',
+        required: true,
       },
       {
+        id: 'spark-step-reinstall',
         title: 'Reinstale',
         description: 'Inicie a rosca à mão e use somente o torque confirmado.',
+        required: true,
       },
     ],
     technicalValues: [
@@ -269,7 +358,12 @@ export const NX200_PROCEDURES: readonly Procedure[] = [
       technicalValue('Torque de aperto'),
     ],
     commonMistakes: ['Iniciar a rosca com a chave.', 'Medir ou ajustar sem a ferramenta adequada.'],
-    finalChecks: ['Cachimbo assentado', 'Motor funcionando regularmente', 'Sem ruído ou folga'],
+    finalChecks: [
+      finalCheck('spark-check-cap', 'Cachimbo assentado'),
+      finalCheck('spark-check-engine', 'Motor funcionando regularmente'),
+      finalCheck('spark-check-noise', 'Sem ruído ou folga aparente'),
+    ],
+    contentNote: 'Checklist demonstrativo — confirme modelo, folga e torque em fonte técnica.',
   },
   {
     slug: 'verificacao-da-bateria',
@@ -278,23 +372,50 @@ export const NX200_PROCEDURES: readonly Procedure[] = [
     description: 'Checagem visual, limpeza dos terminais e medição orientada do estado da bateria.',
     difficulty: 'easy',
     estimatedMinutes: 20,
-    tools: ['Multímetro', 'Escova pequena', 'Chave compatível'],
-    materials: ['Protetor de terminais apropriado', 'Pano limpo'],
+    tools: [
+      resource('battery-tool-multimeter', 'Multímetro'),
+      resource('battery-tool-brush', 'Escova pequena'),
+      resource('battery-tool-wrench', 'Chave compatível'),
+    ],
+    materials: [
+      resource('battery-material-protector', 'Protetor de terminais apropriado'),
+      resource('battery-material-cloth', 'Pano limpo'),
+    ],
     safetyWarnings: [
-      'Evite curto-circuito entre os terminais e trabalhe longe de chamas ou faíscas.',
-      'Ao desconectar, siga a ordem indicada na documentação técnica.',
+      warning(
+        'battery-warning-short',
+        'Evite curto-circuito entre os terminais e trabalhe longe de chamas ou faíscas.',
+      ),
+      warning(
+        'battery-warning-disconnect',
+        'Ao desconectar, siga a ordem indicada na documentação técnica.',
+      ),
     ],
     steps: [
-      { title: 'Inspecione', description: 'Procure trincas, vazamentos, inchaço e oxidação.' },
       {
+        id: 'battery-step-inspect',
+        title: 'Inspecione',
+        description: 'Procure trincas, vazamentos, inchaço e oxidação.',
+        required: true,
+      },
+      {
+        id: 'battery-step-terminals',
         title: 'Confira os terminais',
         description: 'Verifique fixação e limpe sinais de corrosão.',
+        required: true,
       },
       {
+        id: 'battery-step-voltage',
         title: 'Meça a tensão',
         description: 'Faça a medição com o multímetro e compare com valores de fonte confirmada.',
+        required: true,
       },
-      { title: 'Finalize', description: 'Reinstale proteções e confirme que nada ficou solto.' },
+      {
+        id: 'battery-step-finish',
+        title: 'Finalize',
+        description: 'Reinstale proteções e confirme que nada ficou solto.',
+        required: true,
+      },
     ],
     technicalValues: [
       technicalValue('Tipo e capacidade da bateria'),
@@ -302,7 +423,12 @@ export const NX200_PROCEDURES: readonly Procedure[] = [
       technicalValue('Faixa de carga'),
     ],
     commonMistakes: ['Inverter a polaridade.', 'Medir logo após carga sem respeitar o repouso.'],
-    finalChecks: ['Terminais firmes', 'Cabos protegidos', 'Partida normal'],
+    finalChecks: [
+      finalCheck('battery-check-terminals', 'Terminais firmes'),
+      finalCheck('battery-check-cables', 'Cabos protegidos'),
+      finalCheck('battery-check-start', 'Partida observada sem anormalidade aparente'),
+    ],
+    contentNote: 'Checklist demonstrativo — valores elétricos permanecem pendentes de validação.',
   },
   {
     slug: 'regulagem-cabo-embreagem',
@@ -312,24 +438,53 @@ export const NX200_PROCEDURES: readonly Procedure[] = [
       'Inspeção do cabo, medição da folga do manete e ajuste progressivo do acionamento.',
     difficulty: 'easy',
     estimatedMinutes: 25,
-    tools: ['Régua ou medidor', 'Chaves compatíveis'],
-    materials: ['Lubrificante de cabo compatível, se aplicável'],
-    safetyWarnings: ['Teste o acionamento com a motocicleta estável antes de conduzir.'],
+    tools: [
+      resource('clutch-tool-ruler', 'Régua ou medidor'),
+      resource('clutch-tool-wrenches', 'Chaves compatíveis'),
+    ],
+    materials: [
+      resource('clutch-material-lubricant', 'Lubrificante de cabo compatível, se aplicável'),
+    ],
+    safetyWarnings: [
+      warning(
+        'clutch-warning-stable',
+        'Teste o acionamento com a motocicleta estável antes de conduzir.',
+      ),
+    ],
     steps: [
       {
+        id: 'clutch-step-inspect',
         title: 'Inspecione o cabo',
         description: 'Procure fios rompidos, dobras e pontos de atrito.',
+        required: true,
       },
-      { title: 'Meça a folga', description: 'Meça no ponto indicado pela documentação técnica.' },
       {
+        id: 'clutch-step-measure',
+        title: 'Meça a folga',
+        description: 'Meça no ponto indicado pela documentação técnica.',
+        required: true,
+      },
+      {
+        id: 'clutch-step-adjust',
         title: 'Faça o ajuste',
         description: 'Use primeiro o ajustador do manete, sem exceder seu curso.',
+        required: true,
       },
-      { title: 'Trave o ajuste', description: 'Aperte as contraporcas e movimente o guidão.' },
+      {
+        id: 'clutch-step-lock',
+        title: 'Trave o ajuste',
+        description: 'Aperte as contraporcas e movimente o guidão.',
+        required: true,
+      },
     ],
     technicalValues: [technicalValue('Folga livre do manete'), technicalValue('Rota do cabo')],
     commonMistakes: ['Eliminar toda a folga.', 'Ignorar mudança de tensão ao virar o guidão.'],
-    finalChecks: ['Manete retorna livremente', 'Folga constante', 'Engates progressivos'],
+    finalChecks: [
+      finalCheck('clutch-check-return', 'Manete retorna livremente'),
+      finalCheck('clutch-check-freeplay', 'Folga conferida conforme documentação aplicável'),
+      finalCheck('clutch-check-engagement', 'Acionamento progressivo observado'),
+    ],
+    contentNote: 'Checklist demonstrativo — confirme a folga livre em documentação técnica.',
   },
   {
     slug: 'inspecao-dos-freios',
@@ -339,26 +494,47 @@ export const NX200_PROCEDURES: readonly Procedure[] = [
       'Verificação visual e funcional do sistema de freios, com critérios técnicos mantidos como pendentes.',
     difficulty: 'advanced',
     estimatedMinutes: 35,
-    tools: ['Lanterna', 'Paquímetro, se disponível', 'Régua'],
-    materials: ['Pano sem fiapos'],
+    tools: [
+      resource('brake-tool-light', 'Lanterna'),
+      resource('brake-tool-caliper', 'Paquímetro, se disponível'),
+      resource('brake-tool-ruler', 'Régua'),
+    ],
+    materials: [resource('brake-material-cloth', 'Pano sem fiapos')],
     safetyWarnings: [
-      'Freios são itens críticos de segurança. Interrompa o uso da moto em caso de dúvida.',
-      'Não contamine superfícies de atrito com óleo, graxa ou produto de limpeza inadequado.',
+      warning(
+        'brake-warning-critical',
+        'Freios são itens críticos de segurança. Interrompa o uso da moto em caso de dúvida.',
+      ),
+      warning(
+        'brake-warning-contamination',
+        'Não contamine superfícies de atrito com óleo, graxa ou produto de limpeza inadequado.',
+      ),
     ],
     steps: [
       {
+        id: 'brake-step-controls',
         title: 'Teste os comandos',
         description: 'Observe curso, firmeza e retorno dos acionamentos.',
+        required: true,
       },
       {
+        id: 'brake-step-wear',
         title: 'Inspecione o desgaste',
         description: 'Compare pastilhas ou lonas com o limite confirmado.',
+        required: true,
       },
       {
+        id: 'brake-step-leaks',
         title: 'Procure vazamentos',
         description: 'Examine conexões, mangueiras e áreas próximas.',
+        required: true,
       },
-      { title: 'Confira a roda', description: 'Gire a roda e procure arrasto ou ruído anormal.' },
+      {
+        id: 'brake-step-wheel',
+        title: 'Confira a roda',
+        description: 'Gire a roda e procure arrasto ou ruído anormal.',
+        required: true,
+      },
     ],
     technicalValues: [
       technicalValue('Limite de desgaste'),
@@ -370,11 +546,16 @@ export const NX200_PROCEDURES: readonly Procedure[] = [
       'Prosseguir diante de vazamento.',
     ],
     finalChecks: [
-      'Comandos firmes',
-      'Sem vazamentos',
-      'Rodas giram sem travamento',
-      'Teste seguro concluído',
+      finalCheck('brake-check-controls', 'Comandos inspecionados'),
+      finalCheck('brake-check-leaks', 'Ausência de vazamento aparente'),
+      finalCheck('brake-check-wheel', 'Rodas verificadas quanto a arrasto aparente'),
+      finalCheck(
+        'brake-check-professional',
+        'Avaliação profissional procurada quando houver dúvida ou anormalidade',
+      ),
     ],
+    contentNote:
+      'Checklist demonstrativo de inspeção visual; não certifica a segurança do sistema de freios.',
   },
 ];
 

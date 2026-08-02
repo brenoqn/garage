@@ -53,11 +53,43 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'procedures/:slug/prepare',
+        title: 'Preparar procedimento | Garage',
+        loadComponent: () =>
+          import('./features/procedures/procedure-prepare-page').then(
+            (component) => component.ProcedurePreparePage,
+          ),
+      },
+      {
+        path: 'procedures/:slug/run/:executionId',
+        title: 'Executar procedimento | Garage',
+        loadComponent: () =>
+          import('./features/procedures/procedure-run-page').then(
+            (component) => component.ProcedureRunPage,
+          ),
+      },
+      {
         path: 'procedures/:slug',
         title: 'Procedimento | Garage',
         loadComponent: () =>
           import('./features/procedures/procedure-detail-page').then(
             (component) => component.ProcedureDetailPage,
+          ),
+      },
+      {
+        path: 'procedure-executions',
+        title: 'Atividades de procedimentos | Garage',
+        loadComponent: () =>
+          import('./features/procedures/procedure-executions-page').then(
+            (component) => component.ProcedureExecutionsPage,
+          ),
+      },
+      {
+        path: 'procedure-executions/:executionId',
+        title: 'Detalhes da atividade | Garage',
+        loadComponent: () =>
+          import('./features/procedures/procedure-execution-detail-page').then(
+            (component) => component.ProcedureExecutionDetailPage,
           ),
       },
       {

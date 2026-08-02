@@ -29,20 +29,27 @@
 
 ## Sprint 3 — execução guiada
 
-- [ ] checklists locais persistentes para procedimentos;
-- [ ] continuar, reiniciar e concluir uma execução;
-- [ ] oferecer registro de manutenção após concluir, sem criação automática;
-- [ ] definir migração do schema antes de acrescentar o novo estado;
-- [ ] ampliar testes de interação e acessibilidade.
+- [x] schema 3 e migração idempotente v2 → v3, mantendo a cadeia v1 → v2 → v3;
+- [x] IDs estáveis e validação do catálogo dos seis procedimentos;
+- [x] preparação com confirmação dos alertas de segurança;
+- [x] execução persistente, progresso obrigatório, pausa, cancelamento e reinício;
+- [x] verificações finais, conclusão e histórico de atividades em modo somente leitura;
+- [x] registro opcional de manutenção após concluir, sem criação automática;
+- [x] vínculo transacional e individual entre execução e serviço;
+- [x] dashboard com atividade ativa e recente;
+- [x] modo oficina, Wake Lock opcional e temporizador manual;
+- [x] backup schema 3 com importação compatível do schema 2;
+- [x] testes de domínio, store, migração, catálogo, componentes e Wake Lock.
 
 ## Próximas iterações
 
-### Conteúdo validado
+### Sprint 4 recomendada — conteúdo técnico validado
 
 - obter documentação técnica licenciada e confiável;
 - associar valores confirmados por ano-modelo e mercado;
 - revisar procedimentos com profissional qualificado;
-- adicionar imagens próprias ou licenciadas.
+- produzir o primeiro procedimento tecnicamente completo;
+- adicionar imagens próprias ou licenciadas somente após revisão.
 
 ### Experiência
 

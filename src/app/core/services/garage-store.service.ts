@@ -5,8 +5,21 @@ import {
   NX200_SPECIFICATIONS,
 } from '../../data/nx200-demo.data';
 import { createGarageBackup } from '../domain/backup';
-import { decodeStoredGarageState } from '../domain/garage-state-migration';
+import { decodeStoredGarageState, validateGarageState } from '../domain/garage-state-migration';
 import { evaluateOdometerUpdate } from '../domain/odometer-policy';
+import {
+  cancelProcedureExecution,
+  completeProcedureStep,
+  createProcedureExecution,
+  finishProcedureExecution,
+  linkProcedureExecutionToService,
+  ProcedureExecutionResult,
+  restartProcedureExecution,
+  selectActiveProcedureExecution,
+  setFinalCheckCompleted,
+  skipOptionalProcedureStep,
+  uncompleteProcedureStep,
+} from '../domain/procedure-execution';
 import { shouldReplaceMaintenanceExecution } from '../domain/service-chronology';
 import { GarageState, GarageStateRecovery } from '../models/garage-state.model';
 import { Motorcycle } from '../models/motorcycle.model';
@@ -16,6 +29,7 @@ import {
   OdometerUpdateResult,
 } from '../models/odometer-record.model';
 import { NewServiceRecord, ServiceRecord } from '../models/service-record.model';
+import { ProcedureExecution } from '../models/procedure-execution.model';
 import { LocalStorageAdapter } from '../storage/local-storage.adapter';
 import { StoragePort } from '../storage/storage.port';
 
@@ -51,11 +65,121 @@ export class GarageStore {
       b.recordedAt.localeCompare(a.recordedAt),
     ),
   );
+  readonly procedureExecutions = computed(() =>
+    [...this.stateSignal().procedureExecutions].sort((a, b) =>
+      b.updatedAt.localeCompare(a.updatedAt),
+    ),
+  );
+  readonly activeProcedureExecutions = computed(() =>
+    this.procedureExecutions().filter((execution) => execution.status === 'in-progress'),
+  );
   readonly settings = computed(() => this.stateSignal().settings);
   readonly setup = computed(() => this.stateSignal().setup);
   readonly recovery = this.recoverySignal.asReadonly();
   readonly procedures = signal(NX200_PROCEDURES).asReadonly();
   readonly specifications = signal(NX200_SPECIFICATIONS).asReadonly();
+
+  startProcedure(
+    procedureSlug: string,
+    acknowledgedWarningIds: readonly string[],
+  ): ProcedureExecutionResult {
+    const blocked = this.procedureMutationBlock();
+    if (blocked) return { ok: false, error: blocked };
+    const procedure = NX200_PROCEDURES.find((candidate) => candidate.slug === procedureSlug);
+    if (!procedure) return { ok: false, error: 'Procedimento não encontrado.' };
+    const active = selectActiveProcedureExecution(
+      this.stateSignal().procedureExecutions,
+      this.motorcycle().id,
+      procedureSlug,
+    );
+    if (active) {
+      return { ok: false, error: 'Este procedimento já possui uma execução em andamento.' };
+    }
+    const result = createProcedureExecution(
+      procedure,
+      this.motorcycle().id,
+      acknowledgedWarningIds,
+      new Date().toISOString(),
+      this.createId('procedure'),
+    );
+    if (!result.ok) return result;
+    return this.persist({
+      ...this.stateSignal(),
+      procedureExecutions: [result.execution, ...this.stateSignal().procedureExecutions],
+    })
+      ? result
+      : { ok: false, error: 'Não foi possível salvar o início do procedimento.' };
+  }
+
+  completeProcedureStep(executionId: string, stepId: string): ProcedureExecutionResult {
+    return this.changeProcedureExecution(executionId, (procedure, execution, now) =>
+      completeProcedureStep(procedure, execution, stepId, now),
+    );
+  }
+
+  uncompleteProcedureStep(executionId: string, stepId: string): ProcedureExecutionResult {
+    return this.changeProcedureExecution(executionId, (procedure, execution, now) =>
+      uncompleteProcedureStep(procedure, execution, stepId, now),
+    );
+  }
+
+  skipOptionalProcedureStep(executionId: string, stepId: string): ProcedureExecutionResult {
+    return this.changeProcedureExecution(executionId, (procedure, execution, now) =>
+      skipOptionalProcedureStep(procedure, execution, stepId, now),
+    );
+  }
+
+  setProcedureFinalCheck(
+    executionId: string,
+    checkId: string,
+    completed: boolean,
+  ): ProcedureExecutionResult {
+    return this.changeProcedureExecution(executionId, (procedure, execution, now) =>
+      setFinalCheckCompleted(procedure, execution, checkId, completed, now),
+    );
+  }
+
+  finishProcedure(executionId: string, note?: string): ProcedureExecutionResult {
+    return this.changeProcedureExecution(executionId, (procedure, execution, now) =>
+      finishProcedureExecution(procedure, execution, now, note),
+    );
+  }
+
+  cancelProcedure(executionId: string): ProcedureExecutionResult {
+    return this.changeProcedureExecution(executionId, (_procedure, execution, now) =>
+      cancelProcedureExecution(execution, now),
+    );
+  }
+
+  restartProcedure(executionId: string): ProcedureExecutionResult {
+    const blocked = this.procedureMutationBlock();
+    if (blocked) return { ok: false, error: blocked };
+    const execution = this.stateSignal().procedureExecutions.find(
+      (candidate) => candidate.id === executionId,
+    );
+    if (!execution) return { ok: false, error: 'Execução não encontrada.' };
+    const procedure = NX200_PROCEDURES.find(
+      (candidate) => candidate.slug === execution.procedureSlug,
+    );
+    if (!procedure) return { ok: false, error: 'Procedimento não encontrado.' };
+    const result = restartProcedureExecution(
+      procedure,
+      execution,
+      new Date().toISOString(),
+      this.createId('procedure'),
+    );
+    if (!result.ok) return result;
+    const nextExecutions = this.stateSignal().procedureExecutions.map((candidate) =>
+      candidate.id === executionId ? result.cancelled : candidate,
+    );
+    const persisted = this.persist({
+      ...this.stateSignal(),
+      procedureExecutions: [result.restarted, ...nextExecutions],
+    });
+    return persisted
+      ? { ok: true, execution: result.restarted }
+      : { ok: false, error: 'Não foi possível reiniciar o procedimento.' };
+  }
 
   updateMileage(request: OdometerUpdateRequest): OdometerUpdateResult {
     const currentMileage = this.motorcycle().currentMileage;
@@ -195,6 +319,18 @@ export class GarageStore {
       id: this.createId('service'),
       createdAt,
     };
+    let procedureExecutions = this.stateSignal().procedureExecutions;
+    if (record.procedureExecutionId) {
+      const execution = procedureExecutions.find(
+        (candidate) => candidate.id === record.procedureExecutionId,
+      );
+      if (!execution || execution.procedureSlug !== record.procedureSlug) return null;
+      const linked = linkProcedureExecutionToService(execution, record.id, createdAt);
+      if (!linked.ok) return null;
+      procedureExecutions = procedureExecutions.map((candidate) =>
+        candidate.id === execution.id ? linked.execution : candidate,
+      );
+    }
     const odometerRecord: OdometerRecord = {
       id: this.createId('odometer'),
       motorcycleId: this.motorcycle().id,
@@ -230,6 +366,7 @@ export class GarageStore {
             }
           : item,
       ),
+      procedureExecutions,
     };
 
     return this.persist(nextState) ? record : null;
@@ -273,7 +410,7 @@ export class GarageStore {
         },
       };
     }
-    const result = decodeStoredGarageState(rawValue, INITIAL_GARAGE_STATE);
+    const result = decodeStoredGarageState(rawValue, INITIAL_GARAGE_STATE, NX200_PROCEDURES);
     if (result.kind === 'migrated') {
       try {
         this.storage.setRaw(STORAGE_KEY, JSON.stringify(result.state));
@@ -303,6 +440,9 @@ export class GarageStore {
   }
 
   private replaceState(state: GarageState): boolean {
+    if (!validateGarageState(state, NX200_PROCEDURES).valid) {
+      return false;
+    }
     try {
       this.storage.set(STORAGE_KEY, state);
       this.stateSignal.set(state);
@@ -315,6 +455,9 @@ export class GarageStore {
 
   private persist(nextState: GarageState): boolean {
     if (this.recoverySignal()) {
+      return false;
+    }
+    if (!validateGarageState(nextState, NX200_PROCEDURES).valid) {
       return false;
     }
     try {
@@ -347,6 +490,43 @@ export class GarageStore {
       source: request.source,
       note: request.note?.trim() || undefined,
     };
+  }
+
+  private changeProcedureExecution(
+    executionId: string,
+    mutation: (
+      procedure: (typeof NX200_PROCEDURES)[number],
+      execution: ProcedureExecution,
+      now: string,
+    ) => ProcedureExecutionResult,
+  ): ProcedureExecutionResult {
+    const blocked = this.procedureMutationBlock();
+    if (blocked) return { ok: false, error: blocked };
+    const execution = this.stateSignal().procedureExecutions.find(
+      (candidate) => candidate.id === executionId,
+    );
+    if (!execution) return { ok: false, error: 'Execução não encontrada.' };
+    const procedure = NX200_PROCEDURES.find(
+      (candidate) => candidate.slug === execution.procedureSlug,
+    );
+    if (!procedure) return { ok: false, error: 'Procedimento não encontrado.' };
+    const result = mutation(procedure, execution, new Date().toISOString());
+    if (!result.ok) return result;
+    const persisted = this.persist({
+      ...this.stateSignal(),
+      procedureExecutions: this.stateSignal().procedureExecutions.map((candidate) =>
+        candidate.id === execution.id ? result.execution : candidate,
+      ),
+    });
+    return persisted
+      ? result
+      : { ok: false, error: 'Não foi possível salvar a execução do procedimento.' };
+  }
+
+  private procedureMutationBlock(): string | null {
+    if (!this.setup().completed) return 'Conclua a configuração inicial antes de começar.';
+    if (this.recoverySignal()) return 'Resolva a recuperação dos dados locais antes de continuar.';
+    return null;
   }
 
   private createId(prefix: string): string {

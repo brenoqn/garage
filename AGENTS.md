@@ -31,9 +31,23 @@ interface, metadados e documentação.
 12. A interface é mobile-first. Novos fluxos devem funcionar com uma mão e não depender de
     hover.
 13. Não adicione bibliotecas visuais pesadas nem imagens ou logotipos protegidos da Honda.
-14. Antes de concluir qualquer alteração, execute e corrija:
+14. IDs de etapas, alertas, verificações, ferramentas e materiais são persistidos por
+    referência. Não os altere sem migração explícita e teste de integridade.
+15. Regras de criação, avanço, progresso, conclusão, cancelamento, reinício e vínculo de
+    execuções pertencem à camada de domínio, não aos componentes.
+16. Concluir um procedimento nunca cria serviço, atualiza plano ou altera odômetro
+    automaticamente. O registro de manutenção exige uma ação posterior do usuário.
+17. Nenhuma execução pode apontar para procedimento, etapa, alerta ou verificação inexistente.
+18. Uma execução concluída pode ser vinculada a no máximo um serviço, e o vínculo deve ser
+    bidirecional e persistido na mesma transação.
+19. Conteúdo `needs-confirmation` permanece sem alerta ou afirmação operacional. A conclusão de
+    checklist avançado não certifica segurança mecânica.
+20. Wake Lock é um aprimoramento opcional: solicite após ação explícita, libere ao sair do modo
+    oficina e nunca torne o procedimento dependente da API.
+21. Antes de concluir qualquer alteração, execute e corrija:
 
 ```bash
+npm run format:check
 npm run lint
 npm run test:ci
 npm run build
