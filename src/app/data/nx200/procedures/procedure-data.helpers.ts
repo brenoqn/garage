@@ -1,11 +1,14 @@
 import { Procedure, ProcedureRiskLevel } from '../../../core/models/procedure.model';
-import { NX200_PENDING_APPLICABILITY } from '../claims/nx200-claims.data';
+import {
+  NX200_1997_APPLICABILITY,
+  NX200_OWNER_MANUAL_SOURCE_ID,
+} from '../claims/nx200-claims.data';
 
 export const resource = (id: string, name: string) => ({ id, name });
 export const warning = (id: string, text: string) => ({ id, text });
 export const finalCheck = (id: string, label: string) => ({ id, label, required: true });
 
-export function pendingEditorialMetadata(
+export function transcribedEditorialMetadata(
   riskLevel: ProcedureRiskLevel,
   riskNote: string,
 ): Pick<
@@ -15,13 +18,14 @@ export function pendingEditorialMetadata(
   return {
     riskLevel,
     riskNote,
-    primarySourceIds: ['nx200-owner-manual-pending', 'nx200-service-manual-pending'],
-    applicability: NX200_PENDING_APPLICABILITY,
+    primarySourceIds: [NX200_OWNER_MANUAL_SOURCE_ID, 'nx200-service-manual-pending'],
+    applicability: NX200_1997_APPLICABILITY,
     editorialRevision: {
-      version: 1,
+      version: 2,
       revisedAt: '2026-08-02',
-      summary: 'Primeira versão com rastreabilidade editorial; conteúdo técnico ainda pendente.',
-      status: 'demonstrative',
+      summary:
+        'Procedimento básico alinhado ao manual do proprietário aplicável; revisão técnica da transcrição pendente.',
+      status: 'transcribed',
     },
   };
 }

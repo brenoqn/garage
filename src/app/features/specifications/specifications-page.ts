@@ -81,8 +81,10 @@ const statuses: readonly { readonly value: TechnicalContentStatus; readonly labe
       <div class="source-warning" role="note">
         <span aria-hidden="true">!</span>
         <p>
-          Nenhum documento técnico real foi fornecido ao repositório. Todos os valores continuam
-          <strong>A confirmar</strong> e não podem gerar orientação operacional.
+          O manual do proprietário aplicável foi identificado. {{ transcribedCount() }} itens estão
+          transcritos com página e seção, mas aguardam revisão técnica;
+          {{ pendingCount() }} continuam <strong>A confirmar</strong>. Nenhum valor está liberado
+          para uso operacional.
         </p>
       </div>
 
@@ -204,8 +206,8 @@ const statuses: readonly { readonly value: TechnicalContentStatus; readonly labe
         <div class="empty-state" role="status">
           <strong>Nenhuma especificação corresponde aos filtros</strong>
           <p>
-            A aplicabilidade do catálogo ainda é desconhecida. Desative o filtro de aplicabilidade
-            para revisar os itens pendentes.
+            Ajuste os filtros para revisar itens transcritos, pendentes ou aplicáveis à configuração
+            selecionada.
           </p>
         </div>
       }
@@ -234,6 +236,12 @@ export class SpecificationsPage {
   );
   private readonly conflicts = computed(() =>
     detectTechnicalConflicts(this.store.technicalClaims()),
+  );
+  protected readonly transcribedCount = computed(
+    () => this.store.technicalClaims().filter((claim) => claim.status === 'transcribed').length,
+  );
+  protected readonly pendingCount = computed(
+    () => this.store.technicalClaims().filter((claim) => claim.status === 'demonstrative').length,
   );
   private readonly views = computed<readonly SpecificationView[]>(() => {
     const filters = this.filters();

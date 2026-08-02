@@ -2,13 +2,14 @@
 
 ## Estado atual
 
-O Garage suporta somente o produto Honda NX200, mas ainda não possui uma configuração técnica
-confirmada de ano, mercado, variante ou código do motor. O ano `1997` presente no seed é dado
-demonstrativo editável e não prova a identidade da motocicleta real.
+O Garage suporta somente a Honda NX200. O proprietário do projeto confirmou que o Manual do
+Proprietário Honda NX200 `D2203-MAN-0181` é aplicável ao conjunto técnico da NX200 brasileira de 1997. Essa é uma decisão de aplicabilidade documental, não uma revisão das transcrições e nem uma
+prova do código do motor ou da variante física da motocicleta cadastrada.
 
-Nenhuma variante está tecnicamente confirmada. Todas as claims usam aplicabilidade
-`needs-confirmation`; portanto, o filtro “somente confirmadas para a moto cadastrada” retorna
-vazio até que a documentação e a configuração alvo sejam verificadas.
+O nome oficial do arquivo, `NX 200 1994.pdf`, não bloqueia a aplicação ao ano 1997. Somente uma
+diferença concreta encontrada no conteúdo deve ser registrada como conflito. As 27 claims
+transcritas usam o escopo de 1997 e aparecem no filtro de aplicabilidade; quatro dados ausentes no
+manual continuam `needs-confirmation`.
 
 ## Dimensões modeladas
 
@@ -40,5 +41,6 @@ Uma variante só entra como escopo confirmado depois que a identificação da mo
 fonte aplicável forem auditadas. Claims compartilhadas entre variantes precisam declarar o
 escopo e manter citações. Diferenças devem gerar claims separadas, não condicionais implícitas.
 
-Até essa etapa, o Garage deve exibir “A confirmar”, não gerar alertas técnicos e não publicar
-procedimento como integralmente validado.
+Até que cada transcrição receba revisão aprovada, o Garage deve identificá-la como `transcribed`,
+não gerar alertas técnicos e não publicar procedimento como integralmente confirmado. Informação
+ausente continua como `A confirmar`.

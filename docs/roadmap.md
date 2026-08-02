@@ -54,15 +54,20 @@
 - [x] validador executável por `npm run validate:content`;
 - [x] documentação de ingestão, revisão e variantes;
 - [x] nenhum valor confirmado sem documentação suficiente.
+- [x] manual do proprietário oficial identificado por código e URL;
+- [x] aplicabilidade documental confirmada separadamente da revisão técnica;
+- [x] 27 claims transcritas com página e seção e quatro ausências mantidas como `A confirmar`;
+- [x] procedimentos básicos e seed do plano alinhados ao conteúdo coberto pelo manual;
+- [x] manual de serviço mantido como requisito para torques, tolerâncias e reparos avançados.
 
 ## Próximas iterações
 
-### Sprint 5 recomendada — primeiro conteúdo tecnicamente validado
+### Sprint 5 recomendada — revisão das primeiras transcrições
 
-- obter legalmente manual do proprietário, manual de serviço e catálogo aplicáveis;
-- identificar ano de fabricação, ano-modelo, mercado, variante e código do motor da moto alvo;
-- selecionar bateria ou vela como primeiro domínio de menor risco;
-- transcrever somente claims localizadas por página ou seção;
+- revisar tecnicamente as transcrições de bateria ou vela como primeiro domínio de menor risco;
+- obter legalmente manual de serviço e catálogo de peças aplicáveis;
+- identificar variante e código do motor da moto alvo;
+- conferir cada claim transcrita contra página e seção;
 - registrar revisão profissional e resolver divergências;
 - publicar o primeiro procedimento confirmado somente quando todos os critérios passarem;
 - produzir imagens próprias ou licenciadas após a revisão do conteúdo.

@@ -74,7 +74,8 @@ describe('ProcedurePreparePage', () => {
     }).compileComponents();
     const fixture = TestBed.createComponent(ProcedurePreparePage);
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Conteúdo versão 1');
+    expect(fixture.nativeElement.textContent).toContain('Conteúdo versão 2');
+    expect(fixture.nativeElement.textContent).toContain('Aplicabilidade do manual');
     expect(fixture.nativeElement.textContent).toContain('Risco crítico com conteúdo pendente');
     expect(fixture.nativeElement.textContent).toContain('não certifica');
   });

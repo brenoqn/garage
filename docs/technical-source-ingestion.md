@@ -5,9 +5,10 @@ Garage não recebe upload de PDF pelo usuário e não redistribui manuais.
 
 ## 1. Identificar o documento
 
-Registre título, editor ou fabricante, código, edição, ano, idioma, mercado e tipo. Confirme que
-o documento é realmente aplicável à Honda NX200 em análise; sem identificação suficiente, use
-`availability: partial` ou `unavailable` e não transcreva valores como confirmados.
+Registre título, editor ou fabricante, código, edição, nome do arquivo, URL oficial, data de
+acesso, idioma, mercado e tipo. Confirme que o documento é realmente aplicável à Honda NX200 em
+análise; sem identificação suficiente, use `availability: partial` ou `unavailable` e não
+transcreva valores como confirmados.
 
 ## 2. Verificar direitos e uso
 
@@ -23,8 +24,9 @@ registro de outra edição.
 
 ## 4. Localizar a evidência
 
-Encontre página, página rotulada, seção, tabela ou figura. Uma referência genérica ao manual não
-é suficiente. Registre `TechnicalCitation` e uma nota curta apenas quando ela ajudar a explicar a
+Encontre a página e a seção. Tabela ou figura podem complementar a localização, mas não substituem
+esses dois campos para conteúdo derivado de fonte. Uma referência genérica ao manual não é
+suficiente. Registre `TechnicalCitation` e uma nota curta apenas quando ela ajudar a explicar a
 condição do valor.
 
 ## 5. Transcrever somente o necessário
@@ -36,14 +38,23 @@ transcrição inicial.
 ## 6. Definir aplicabilidade
 
 Registre Honda NX200 e, quando documentados, intervalo de anos, mercado, variante e código do
-motor. Compatibilidade com XR200, CBX200, NX150 ou outro modelo exige claim própria e evidência;
-sem isso, mantenha `needs-confirmation`.
+motor. Uma confirmação do proprietário sobre a aplicabilidade do documento deve ser registrada em
+`TechnicalSourceApplicabilityDecision`; ela não é uma `TechnicalReview`. Compatibilidade com
+XR200, CBX200, NX150 ou outro modelo exige claim própria e evidência; sem isso, mantenha
+`needs-confirmation`.
+
+Para o manual `D2203-MAN-0181`, a aplicabilidade à NX200 brasileira de 1997 foi confirmada pelo
+proprietário. O ano `1994` no nome do arquivo não é conflito automático.
 
 ## 7. Revisar
 
 Um revisor identificável compara a claim com a localização citada, unidades, contexto,
 aplicabilidade e riscos. Registre a decisão em código conforme
 `technical-review-policy.md`. O usuário local não pode aprovar conteúdo.
+
+Não extrapole o manual do proprietário para desmontagens ou reparos ausentes. Torques,
+tolerâncias internas, diagramas completos e desmontagem avançada continuam dependendo do manual
+de serviço, mesmo quando o manual do proprietário fornece orientação básica relacionada.
 
 ## 8. Resolver conflitos
 
@@ -61,10 +72,10 @@ afetados e execute formatação, lint, testes, validação de conteúdo e builds
 
 - documento e licença verificados;
 - metadados e ID estável registrados;
-- página ou seção localizada;
+- página e seção localizadas;
 - transcrição curta e fiel;
 - valor e unidade preservados;
-- aplicabilidade delimitada;
+- decisão de aplicabilidade registrada separadamente da revisão;
 - revisão registrada;
 - conflitos resolvidos;
 - testes e versão editorial atualizados.

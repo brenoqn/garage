@@ -33,7 +33,12 @@ export interface TechnicalDocumentSource {
   readonly publicationYear?: number;
   readonly language?: string;
   readonly market?: string;
+  readonly fileName?: string;
+  readonly url?: string;
+  readonly accessedAt?: string;
   readonly availability: TechnicalSourceAvailability;
+  /** Decisões de aplicabilidade da fonte; não equivalem à revisão das transcrições. */
+  readonly applicabilityDecisions?: readonly TechnicalSourceApplicabilityDecision[];
   readonly notes?: string;
 }
 
@@ -58,6 +63,16 @@ export interface MotorcycleApplicability {
   readonly markets?: readonly string[];
   readonly variants?: readonly string[];
   readonly engineCodes?: readonly string[];
+  readonly notes?: string;
+}
+
+export interface TechnicalSourceApplicabilityDecision {
+  readonly id: string;
+  readonly decidedAt: string;
+  readonly decidedBy: string;
+  readonly deciderRole?: string;
+  readonly applicability: MotorcycleApplicability;
+  readonly basis: string;
   readonly notes?: string;
 }
 

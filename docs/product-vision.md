@@ -21,7 +21,7 @@ técnica oficial.
 - dados armazenados no dispositivo, com migração e backup;
 - histórico de serviços e leituras do odômetro;
 - plano preventivo com intervalos não confirmados inativos;
-- seis procedimentos demonstrativos com preparação e execução interativa;
+- seis procedimentos básicos transcritos, com preparação e execução interativa;
 - progresso local, retomada, modo oficina e histórico de atividades;
 - registro opcional de manutenção depois da conclusão;
 - alertas dentro do aplicativo;

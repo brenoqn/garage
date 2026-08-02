@@ -18,12 +18,13 @@ suportada.
 - intervalos sem fonte confirmada visíveis, porém inativos nas contagens e nos alertas;
 - registro cronológico de serviços, peças, custos e observações;
 - atualização da referência do plano somente quando o serviço vinculado é mais recente;
-- biblioteca pesquisável com seis procedimentos demonstrativos e IDs estáveis;
+- biblioteca pesquisável com seis procedimentos básicos transcritos e IDs estáveis;
 - preparação com confirmação de segurança, execução passo a passo e retomada local;
 - histórico de procedimentos em andamento, concluídos e cancelados;
 - modo oficina, Wake Lock opcional e temporizador manual por horário de término;
 - registro opcional de manutenção após a conclusão, com vínculo individual à execução;
-- especificações não confirmadas marcadas como **A confirmar**;
+- especificações transcritas identificadas como revisão pendente e dados ausentes marcados como
+  **A confirmar**;
 - catálogo editorial com fontes, claims, citações, aplicabilidade e revisões;
 - transparência em `/technical-sources`, filtros por sistema, estado e aplicabilidade;
 - versionamento editorial e risco separados da dificuldade dos procedimentos;
@@ -99,11 +100,20 @@ O catálogo técnico é estático e separado dos dados pessoais. Ele estrutura d
 citações localizadas, aplicabilidade por ano/mercado/variante, claims, revisões, conflitos e
 revisões editoriais dos procedimentos. Nada disso entra no `GarageState` ou no backup.
 
-Nenhum manual, PDF ou transcrição técnica real está presente no repositório. Os quatro registros
-de fonte atuais identificam apenas materiais necessários e têm disponibilidade `unavailable`.
-Consequentemente, todas as claims permanecem `demonstrative`, com valor **A confirmar**, sem
-citação ou revisão e sem uso operacional. Os intervalos demonstrativos do plano continuam
-inativos em alertas.
+O Manual do Proprietário Honda NX200, código `D2203-MAN-0181`, foi localizado no domínio oficial
+da Honda. O proprietário do projeto confirmou sua aplicabilidade ao conjunto técnico da NX200
+brasileira de 1997. O nome do arquivo oficial, `NX 200 1994.pdf`, não é tratado isoladamente como
+divergência de aplicabilidade.
+
+O catálogo possui 27 claims `transcribed`, todas com página e seção, e quatro claims
+`demonstrative` com **A confirmar** porque o manual não fornece a informação necessária. Nenhuma
+claim recebeu revisão técnica aprovada ou estado `confirmed`; por isso, valores e intervalos
+continuam sem uso operacional e não ativam alertas. A decisão de aplicabilidade da fonte é um
+registro diferente da revisão das transcrições.
+
+O PDF não é incluído nem redistribuído pelo repositório. O catálogo guarda metadados, URL oficial,
+citações e paráfrases mínimas. Manual de serviço continua necessário para desmontagem avançada,
+diagramas completos, tolerâncias internas e validação de torques.
 
 `npm run validate:content` verifica IDs, referências, páginas, aplicabilidade, revisões,
 conflitos, supersessões e compatibilidade do catálogo. O comando não altera arquivos e falha se

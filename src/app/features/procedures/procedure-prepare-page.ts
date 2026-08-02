@@ -37,9 +37,7 @@ import { GarageStore } from '../../core/services/garage-store.service';
             </span>
           </div>
           <p>{{ guide.editorialRevision.summary }}</p>
-          <p>
-            <strong>Aplicabilidade:</strong> ano, mercado e variante ainda precisam ser confirmados.
-          </p>
+          <p><strong>Aplicabilidade:</strong> {{ guide.applicability.notes }}</p>
           <p>
             <strong>Valores:</strong> {{ confirmedClaimCount() }} confirmados ·
             {{ pendingClaimCount() }} pendentes.

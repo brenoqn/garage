@@ -40,18 +40,13 @@ function duplicated(values: readonly string[]): readonly string[] {
 
 function validateApplicability(
   applicability: MotorcycleApplicability,
-  claimId: string,
+  entityId: string,
+  scope = 'claims',
 ): readonly ContentValidationIssue[] {
   const issues: ContentValidationIssue[] = [];
   if (applicability.manufacturer !== 'Honda' || applicability.model !== 'NX200') {
     issues.push(
-      issue(
-        'error',
-        'applicability-model',
-        'claims',
-        claimId,
-        'Aplicabilidade fora da Honda NX200.',
-      ),
+      issue('error', 'applicability-model', scope, entityId, 'Aplicabilidade fora da Honda NX200.'),
     );
   }
   if (
@@ -64,7 +59,7 @@ function validateApplicability(
       applicability.yearFrom > applicability.yearTo)
   ) {
     issues.push(
-      issue('error', 'applicability-year', 'claims', claimId, 'Intervalo de anos inválido.'),
+      issue('error', 'applicability-year', scope, entityId, 'Intervalo de anos inválido.'),
     );
   }
   for (const [name, values] of [
@@ -74,13 +69,7 @@ function validateApplicability(
   ] as const) {
     if (values?.some((value) => !isNonEmpty(value))) {
       issues.push(
-        issue(
-          'error',
-          'applicability-empty-value',
-          'claims',
-          claimId,
-          `${name} contém valor vazio.`,
-        ),
+        issue('error', 'applicability-empty-value', scope, entityId, `${name} contém valor vazio.`),
       );
     }
   }
@@ -233,6 +222,62 @@ export function validateTechnicalCatalog(
         ),
       );
     }
+    if (source.url) {
+      try {
+        const parsed = new URL(source.url);
+        if (parsed.protocol !== 'https:') throw new Error('unsupported protocol');
+      } catch {
+        issues.push(
+          issue('error', 'source-invalid-url', 'sources', source.id, 'URL da fonte inválida.'),
+        );
+      }
+    }
+    if (source.accessedAt && Number.isNaN(Date.parse(source.accessedAt))) {
+      issues.push(
+        issue(
+          'error',
+          'source-invalid-access-date',
+          'sources',
+          source.id,
+          'Data de acesso da fonte inválida.',
+        ),
+      );
+    }
+    const applicabilityDecisionIds = (source.applicabilityDecisions ?? []).map(
+      (decision) => decision.id,
+    );
+    duplicated(applicabilityDecisionIds).forEach((id) =>
+      issues.push(
+        issue(
+          'error',
+          'duplicate-applicability-decision-id',
+          'sources',
+          source.id,
+          `Decisão de aplicabilidade duplicada: ${id}.`,
+        ),
+      ),
+    );
+    for (const decision of source.applicabilityDecisions ?? []) {
+      if (
+        !isNonEmpty(decision.id) ||
+        !isNonEmpty(decision.decidedBy) ||
+        !isNonEmpty(decision.basis) ||
+        Number.isNaN(Date.parse(decision.decidedAt))
+      ) {
+        issues.push(
+          issue(
+            'error',
+            'invalid-applicability-decision',
+            'sources',
+            source.id,
+            'Decisão de aplicabilidade sem ID, responsável, base ou data válida.',
+          ),
+        );
+      }
+      issues.push(
+        ...validateApplicability(decision.applicability, `${source.id}:${decision.id}`, 'sources'),
+      );
+    }
   }
 
   for (const claim of catalog.claims) {
@@ -294,6 +339,40 @@ export function validateTechnicalCatalog(
           ),
         );
       }
+    }
+    if (
+      (claim.status === 'transcribed' ||
+        claim.status === 'under-review' ||
+        claim.status === 'confirmed') &&
+      claim.citations.length === 0
+    ) {
+      issues.push(
+        issue(
+          'error',
+          'source-derived-without-citation',
+          'claims',
+          claim.id,
+          'Conteúdo derivado de fonte exige citação.',
+        ),
+      );
+    }
+    if (
+      (claim.status === 'transcribed' ||
+        claim.status === 'under-review' ||
+        claim.status === 'confirmed') &&
+      claim.citations.some(
+        (citation) => citation.page === undefined || !isNonEmpty(citation.section),
+      )
+    ) {
+      issues.push(
+        issue(
+          'error',
+          'citation-missing-page-or-section',
+          'claims',
+          claim.id,
+          'Toda transcrição exige página e seção.',
+        ),
+      );
     }
     for (const expectedSourceId of claim.expectedSourceIds ?? []) {
       if (!sourceIdSet.has(expectedSourceId)) {

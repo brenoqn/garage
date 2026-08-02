@@ -1,14 +1,19 @@
 import { Procedure } from '../../../core/models/procedure.model';
-import { finalCheck, pendingEditorialMetadata, resource, warning } from './procedure-data.helpers';
+import {
+  finalCheck,
+  resource,
+  transcribedEditorialMetadata,
+  warning,
+} from './procedure-data.helpers';
 
 export const SPARK_PLUG_INSPECTION_PROCEDURE: Procedure = {
   slug: 'inspecao-da-vela',
   title: 'Inspeção da vela',
   category: 'Motor',
   description:
-    'Remoção, leitura visual e reinstalação segura da vela de ignição, sem assumir medidas não confirmadas.',
+    'Remoção, inspeção visual, medição da folga e reinstalação básica conforme o manual aplicável.',
   difficulty: 'moderate',
-  ...pendingEditorialMetadata(
+  ...transcribedEditorialMetadata(
     'moderate',
     'Rosca, aperto ou componente incorreto podem danificar o cabeçote ou afetar o funcionamento.',
   ),
@@ -16,7 +21,7 @@ export const SPARK_PLUG_INSPECTION_PROCEDURE: Procedure = {
   tools: [
     resource('spark-tool-wrench', 'Chave de vela compatível'),
     resource('spark-tool-gauge', 'Calibrador de lâminas'),
-    resource('spark-tool-air', 'Ar comprimido, se disponível'),
+    resource('spark-tool-air', 'Escova de aço ou arame; o manual não orienta ar comprimido'),
   ],
   materials: [
     resource('spark-material-cloth', 'Pano limpo'),
@@ -47,22 +52,28 @@ export const SPARK_PLUG_INSPECTION_PROCEDURE: Procedure = {
     {
       id: 'spark-step-gap',
       title: 'Confirme a folga',
-      description: 'Meça a abertura e compare com a documentação técnica correta.',
+      description: 'Meça com calibrador; o manual transcreve folga de 0,8–0,9 mm.',
       required: true,
     },
     {
       id: 'spark-step-reinstall',
       title: 'Reinstale',
-      description: 'Inicie a rosca à mão e use somente o torque confirmado.',
+      description:
+        'Inicie a rosca à mão. O manual orienta aperto por fração de volta; torque numérico continua dependente do manual de serviço.',
       required: true,
     },
   ],
   technicalClaimIds: ['spec-spark-plug-model', 'spec-spark-plug-gap', 'spec-spark-plug-torque'],
-  commonMistakes: ['Iniciar a rosca com a chave.', 'Medir ou ajustar sem a ferramenta adequada.'],
+  commonMistakes: [
+    'Iniciar a rosca com a chave.',
+    'Apertar excessivamente.',
+    'Usar vela com grau térmico diferente do especificado.',
+  ],
   finalChecks: [
     finalCheck('spark-check-cap', 'Cachimbo assentado'),
     finalCheck('spark-check-engine', 'Motor funcionando regularmente'),
     finalCheck('spark-check-noise', 'Sem ruído ou folga aparente'),
   ],
-  contentNote: 'Checklist demonstrativo — confirme modelo, folga e torque em fonte técnica.',
+  contentNote:
+    'Transcrito da seção “Vela de ignição” (págs. 50–51). Modelo e folga possuem citação; torque numérico não consta no manual do proprietário.',
 };

@@ -1,5 +1,10 @@
 import { Procedure } from '../../../core/models/procedure.model';
-import { finalCheck, pendingEditorialMetadata, resource, warning } from './procedure-data.helpers';
+import {
+  finalCheck,
+  resource,
+  transcribedEditorialMetadata,
+  warning,
+} from './procedure-data.helpers';
 
 export const OIL_CHANGE_PROCEDURE: Procedure = {
   slug: 'troca-de-oleo',
@@ -8,7 +13,7 @@ export const OIL_CHANGE_PROCEDURE: Procedure = {
   description:
     'Roteiro guiado para drenar o óleo usado, revisar a vedação e completar o motor com o produto correto.',
   difficulty: 'moderate',
-  ...pendingEditorialMetadata(
+  ...transcribedEditorialMetadata(
     'moderate',
     'Erros podem causar vazamentos, lubrificação inadequada ou dano ao motor.',
   ),
@@ -21,12 +26,12 @@ export const OIL_CHANGE_PROCEDURE: Procedure = {
   ],
   materials: [
     resource('oil-material-oil', 'Óleo especificado para a motocicleta'),
-    resource('oil-material-seal', 'Arruela de vedação, se necessário'),
+    resource('oil-material-seal', 'Anel de vedação do bujão, se necessário'),
   ],
   safetyWarnings: [
     warning(
       'oil-warning-stability',
-      'Trabalhe com a motocicleta estável, em local ventilado e com o motor apenas morno.',
+      'Faça o serviço com o motor em temperatura normal de funcionamento e a motocicleta apoiada com estabilidade.',
     ),
     warning(
       'oil-warning-disposal',
@@ -37,32 +42,36 @@ export const OIL_CHANGE_PROCEDURE: Procedure = {
     {
       id: 'oil-step-prepare',
       title: 'Prepare a área',
-      description: 'Estabilize a moto e posicione o recipiente coletor.',
+      description: 'Apóie a motocicleta no cavalete lateral e posicione o recipiente coletor.',
       required: true,
     },
     {
       id: 'oil-step-drain',
       title: 'Drene o óleo',
-      description: 'Abra o ponto de abastecimento e remova o bujão de drenagem com cuidado.',
+      description:
+        'Remova o medidor de nível; retire o bujão, a mola e o filtro de tela e deixe o óleo drenar.',
       required: true,
       safetyNote: 'Use luvas e evite contato com óleo quente.',
     },
     {
       id: 'oil-step-seal',
-      title: 'Inspecione a vedação',
-      description: 'Limpe o bujão e verifique a arruela antes da reinstalação.',
+      title: 'Inspecione o conjunto',
+      description:
+        'Limpe o filtro de tela e verifique filtro, mola e anel de vedação antes da reinstalação.',
       required: true,
     },
     {
       id: 'oil-step-refill',
       title: 'Reabasteça',
-      description: 'Aplique o torque e o volume somente após confirmá-los em fonte técnica.',
+      description:
+        'O manual transcreve aproximadamente 1,1 L para a troca e 15 N·m no bujão; não use o torque antes do confronto com o manual de serviço.',
       required: true,
     },
     {
       id: 'oil-step-level',
       title: 'Confira o nível',
-      description: 'Siga o método de medição indicado na documentação e procure vazamentos.',
+      description:
+        'Deixe o motor em marcha lenta por 2 a 3 minutos, desligue, confira o nível com a moto vertical e procure vazamentos.',
       required: true,
     },
   ],
@@ -77,5 +86,6 @@ export const OIL_CHANGE_PROCEDURE: Procedure = {
     finalCheck('oil-check-leaks', 'Ausência de vazamentos aparentes'),
     finalCheck('oil-check-fasteners', 'Bujão e tampa conferidos'),
   ],
-  contentNote: 'Checklist demonstrativo — valores técnicos permanecem pendentes de validação.',
+  contentNote:
+    'Transcrito das seções “Troca do óleo do motor” (págs. 48–49) e “Óleo do motor” (págs. 22–23). Revisão técnica pendente.',
 };

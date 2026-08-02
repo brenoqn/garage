@@ -27,7 +27,7 @@ const claim = (id: string, value = '10'): TechnicalClaim => ({
     yearTo: 1997,
     markets: ['Brasil'],
   },
-  citations: [{ sourceId: source.id, page: 10 }],
+  citations: [{ sourceId: source.id, page: 10, section: 'Tabela de teste' }],
   reviews: [
     {
       id: `review-${id}`,
@@ -57,7 +57,7 @@ describe('technical catalog validator', () => {
     const warnings = validateTechnicalCatalog(NX200_TECHNICAL_CATALOG).filter(
       (item) => item.code === 'source-unavailable',
     );
-    expect(warnings).toHaveLength(NX200_TECHNICAL_CATALOG.sources.length);
+    expect(warnings).toHaveLength(3);
   });
 
   it('rejects confirmation without citation, review or confirmed applicability', () => {
@@ -82,6 +82,44 @@ describe('technical catalog validator', () => {
     expect(codes).toContain('citation-missing-source');
     expect(codes).toContain('citation-invalid-page');
     expect(codes).toContain('citation-missing-location');
+  });
+
+  it('requires page and section for every source-derived claim', () => {
+    const invalid: TechnicalClaim = {
+      ...claim('missing-section'),
+      status: 'transcribed',
+      citations: [{ sourceId: source.id, page: 10 }],
+      reviews: [],
+    };
+    expect(validateTechnicalCatalog(catalog([invalid])).map((item) => item.code)).toContain(
+      'citation-missing-page-or-section',
+    );
+  });
+
+  it('validates source applicability decisions independently from technical reviews', () => {
+    const invalidSource: TechnicalDocumentSource = {
+      ...source,
+      applicabilityDecisions: [
+        {
+          id: 'decision',
+          decidedAt: 'invalid-date',
+          decidedBy: '',
+          basis: '',
+          applicability: {
+            manufacturer: 'Honda',
+            model: 'NX200',
+            confirmation: 'confirmed',
+            yearFrom: 1998,
+            yearTo: 1997,
+          },
+        },
+      ],
+    };
+    const codes = validateTechnicalCatalog({ ...catalog([]), sources: [invalidSource] }).map(
+      (item) => item.code,
+    );
+    expect(codes).toContain('invalid-applicability-decision');
+    expect(codes).toContain('applicability-year');
   });
 
   it('rejects change-requested or rejected reviews as current confirmation', () => {

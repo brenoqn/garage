@@ -1,25 +1,31 @@
 import { Procedure } from '../../../core/models/procedure.model';
-import { finalCheck, pendingEditorialMetadata, resource, warning } from './procedure-data.helpers';
+import {
+  finalCheck,
+  resource,
+  transcribedEditorialMetadata,
+  warning,
+} from './procedure-data.helpers';
 
 export const BATTERY_CHECK_PROCEDURE: Procedure = {
   slug: 'verificacao-da-bateria',
   title: 'Verificação da bateria',
   category: 'Elétrica',
-  description: 'Checagem visual, limpeza dos terminais e medição orientada do estado da bateria.',
+  description:
+    'Checagem visual do eletrólito, terminais, tubo de respiro e condições externas da bateria.',
   difficulty: 'easy',
-  ...pendingEditorialMetadata(
+  ...transcribedEditorialMetadata(
     'moderate',
     'Curto-circuito, polaridade incorreta ou contato com eletrólito podem causar ferimentos e danos.',
   ),
   estimatedMinutes: 20,
   tools: [
-    resource('battery-tool-multimeter', 'Multímetro'),
-    resource('battery-tool-brush', 'Escova pequena'),
+    resource('battery-tool-multimeter', 'Multímetro; valores de diagnóstico não constam no manual'),
     resource('battery-tool-wrench', 'Chave compatível'),
+    resource('battery-tool-brush', 'Funil plástico ou seringa pequena, se necessário'),
   ],
   materials: [
-    resource('battery-material-protector', 'Protetor de terminais apropriado'),
-    resource('battery-material-cloth', 'Pano limpo'),
+    resource('battery-material-protector', 'Água destilada, somente se necessário'),
+    resource('battery-material-cloth', 'Água limpa para resposta a contato acidental'),
   ],
   safetyWarnings: [
     warning(
@@ -28,32 +34,35 @@ export const BATTERY_CHECK_PROCEDURE: Procedure = {
     ),
     warning(
       'battery-warning-disconnect',
-      'Ao desconectar, siga a ordem indicada na documentação técnica.',
+      'Com a ignição desligada, desconecte primeiro o terminal negativo e depois o positivo.',
     ),
   ],
   steps: [
     {
       id: 'battery-step-inspect',
       title: 'Inspecione',
-      description: 'Procure trincas, vazamentos, inchaço e oxidação.',
+      description:
+        'Procure danos e vazamentos; confira se o eletrólito está entre as marcas da carcaça.',
       required: true,
     },
     {
       id: 'battery-step-terminals',
       title: 'Confira os terminais',
-      description: 'Verifique fixação e limpe sinais de corrosão.',
+      description:
+        'Se a remoção for necessária, desligue a ignição e desconecte primeiro o terminal negativo e depois o positivo.',
       required: true,
     },
     {
       id: 'battery-step-voltage',
-      title: 'Meça a tensão',
-      description: 'Faça a medição com o multímetro e compare com valores de fonte confirmada.',
+      title: 'Respeite o limite da fonte',
+      description:
+        'A tensão de repouso e a faixa de carga não constam no manual do proprietário; não interprete a medição sem fonte adicional.',
       required: true,
     },
     {
       id: 'battery-step-finish',
       title: 'Finalize',
-      description: 'Reinstale proteções e confirme que nada ficou solto.',
+      description: 'Confira o tubo de respiro sem dobras ou torções e reinstale as proteções.',
       required: true,
     },
   ],
@@ -62,11 +71,16 @@ export const BATTERY_CHECK_PROCEDURE: Procedure = {
     'spec-battery-resting-voltage',
     'spec-battery-charging-range',
   ],
-  commonMistakes: ['Inverter a polaridade.', 'Medir logo após carga sem respeitar o repouso.'],
+  commonMistakes: [
+    'Inverter a ordem de desconexão dos terminais.',
+    'Completar com água corrente ou ultrapassar a marca superior.',
+    'Dobrar ou torcer o tubo de respiro.',
+  ],
   finalChecks: [
     finalCheck('battery-check-terminals', 'Terminais firmes'),
     finalCheck('battery-check-cables', 'Cabos protegidos'),
     finalCheck('battery-check-start', 'Partida observada sem anormalidade aparente'),
   ],
-  contentNote: 'Checklist demonstrativo — valores elétricos permanecem pendentes de validação.',
+  contentNote:
+    'Inspeção básica transcrita da seção “Bateria” (págs. 70–71). Tensão de repouso e faixa de carga continuam pendentes de documentação técnica adicional.',
 };

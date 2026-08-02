@@ -1,21 +1,29 @@
 import { Procedure } from '../../../core/models/procedure.model';
-import { finalCheck, pendingEditorialMetadata, resource, warning } from './procedure-data.helpers';
+import {
+  finalCheck,
+  resource,
+  transcribedEditorialMetadata,
+  warning,
+} from './procedure-data.helpers';
 
 export const BRAKE_INSPECTION_PROCEDURE: Procedure = {
   slug: 'inspecao-dos-freios',
   title: 'Inspeção dos freios',
   category: 'Freios',
   description:
-    'Verificação visual e funcional do sistema de freios, com critérios técnicos mantidos como pendentes.',
+    'Verificação visual e funcional dos comandos, fluido, vazamentos e indicadores de desgaste.',
   difficulty: 'advanced',
-  ...pendingEditorialMetadata(
+  ...transcribedEditorialMetadata(
     'critical',
     'Falhas ou interpretação incorreta podem comprometer diretamente a frenagem. O checklist não certifica segurança.',
   ),
   estimatedMinutes: 35,
   tools: [
     resource('brake-tool-light', 'Lanterna'),
-    resource('brake-tool-caliper', 'Paquímetro, se disponível'),
+    resource(
+      'brake-tool-caliper',
+      'Paquímetro; não necessário para os indicadores visuais descritos no manual',
+    ),
     resource('brake-tool-ruler', 'Régua'),
   ],
   materials: [resource('brake-material-cloth', 'Pano sem fiapos')],
@@ -33,13 +41,15 @@ export const BRAKE_INSPECTION_PROCEDURE: Procedure = {
     {
       id: 'brake-step-controls',
       title: 'Teste os comandos',
-      description: 'Observe curso, firmeza e retorno dos acionamentos.',
+      description:
+        'Observe o freio dianteiro hidráulico e a folga do pedal traseiro, transcrita como 20–30 mm.',
       required: true,
     },
     {
       id: 'brake-step-wear',
       title: 'Inspecione o desgaste',
-      description: 'Compare pastilhas ou lonas com o limite confirmado.',
+      description:
+        'Confira as ranhuras das pastilhas dianteiras e o alinhamento entre seta e marca do indicador traseiro.',
       required: true,
     },
     {
@@ -70,5 +80,5 @@ export const BRAKE_INSPECTION_PROCEDURE: Procedure = {
     ),
   ],
   contentNote:
-    'Checklist demonstrativo de inspeção visual; não certifica a segurança do sistema de freios.',
+    'Inspeção visual transcrita das seções de freios (págs. 12–15 e 68–69). Reparos, sangria e limpeza interna do freio traseiro não são cobertos por este checklist.',
 };

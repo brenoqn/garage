@@ -13,6 +13,7 @@ import {
   calculateProcedureProgress,
   canFinishProcedure,
 } from '../../core/domain/procedure-execution';
+import { technicalStatusLabel } from '../../core/domain/technical-content';
 import { ProcedureStep } from '../../core/models/procedure.model';
 import { GarageStore } from '../../core/services/garage-store.service';
 import { ScreenWakeLockService } from '../../core/services/screen-wake-lock.service';
@@ -45,11 +46,8 @@ import { ScreenWakeLockService } from '../../core/services/screen-wake-lock.serv
 
             <div class="run-technical-reference">
               <span>
-                Conteúdo
-                {{
-                  guide.editorialRevision.status === 'confirmed' ? 'confirmado' : 'demonstrativo'
-                }}
-                · versão {{ guide.editorialRevision.version }}
+                Conteúdo {{ editorialStatusLabel(guide.editorialRevision.status) }} · versão
+                {{ guide.editorialRevision.version }}
               </span>
               <a class="text-button" routerLink="/technical-sources">Ver fonte técnica</a>
             </div>
@@ -388,6 +386,7 @@ import { ScreenWakeLockService } from '../../core/services/screen-wake-lock.serv
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProcedureRunPage implements OnDestroy {
+  protected readonly editorialStatusLabel = technicalStatusLabel;
   protected readonly store = inject(GarageStore);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);

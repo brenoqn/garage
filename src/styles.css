@@ -1671,7 +1671,8 @@ textarea::placeholder {
   padding: 0.35rem 0.55rem;
 }
 
-.editorial-badge[data-status='confirmed'] {
+.editorial-badge[data-status='confirmed'],
+.editorial-badge[data-status='available'] {
   background: var(--ok-soft);
   border-color: #b9ddcb;
   color: var(--ok);
@@ -1685,7 +1686,8 @@ textarea::placeholder {
 }
 
 .editorial-badge[data-status='under-review'],
-.editorial-badge[data-status='transcribed'] {
+.editorial-badge[data-status='transcribed'],
+.editorial-badge[data-status='partial'] {
   background: var(--upcoming-soft);
   border-color: #eadba9;
   color: var(--upcoming);
@@ -1775,6 +1777,23 @@ textarea::placeholder {
   color: var(--ink-muted);
   font-size: 0.72rem;
   line-height: 1.5;
+}
+
+.source-applicability {
+  background: var(--ok-soft);
+  border: 1px solid #b9ddcb;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  margin-top: 0.8rem;
+  padding: 0.8rem;
+}
+
+.source-applicability p {
+  margin: 0.35rem 0;
+}
+
+.source-applicability small {
+  color: var(--ink-muted);
 }
 
 .technical-claims-section {

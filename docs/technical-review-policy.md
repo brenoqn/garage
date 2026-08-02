@@ -14,6 +14,17 @@ que não possa verificar.
 
 A decisão mais recente é a vigente. Somente `approved` permite considerar a revisão cumprida.
 
+## Aplicabilidade não é aprovação
+
+Uma `TechnicalSourceApplicabilityDecision` responde se o documento pode ser usado para um escopo
+de motocicleta. Uma `TechnicalReview` verifica a fidelidade e a segurança de uma claim
+transcrita. A primeira não cria, substitui nem implica a segunda.
+
+O proprietário confirmou a aplicabilidade do manual `D2203-MAN-0181` à NX200 brasileira de 1997.
+As transcrições permanecem sem aprovação enquanto não houver revisão técnica registrada. O ano no
+nome do arquivo não é divergência por si só; divergências devem apontar diferenças reais de
+conteúdo.
+
 ## Requisitos para confirmação
 
 Uma claim recebe `confirmed` apenas quando possui:

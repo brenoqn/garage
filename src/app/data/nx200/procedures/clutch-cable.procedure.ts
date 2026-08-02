@@ -1,5 +1,10 @@
 import { Procedure } from '../../../core/models/procedure.model';
-import { finalCheck, pendingEditorialMetadata, resource, warning } from './procedure-data.helpers';
+import {
+  finalCheck,
+  resource,
+  transcribedEditorialMetadata,
+  warning,
+} from './procedure-data.helpers';
 
 export const CLUTCH_CABLE_PROCEDURE: Procedure = {
   slug: 'regulagem-cabo-embreagem',
@@ -7,7 +12,7 @@ export const CLUTCH_CABLE_PROCEDURE: Procedure = {
   category: 'Comandos',
   description: 'Inspeção do cabo, medição da folga do manete e ajuste progressivo do acionamento.',
   difficulty: 'easy',
-  ...pendingEditorialMetadata(
+  ...transcribedEditorialMetadata(
     'moderate',
     'Folga ou roteamento incorreto pode afetar o acionamento e o controle da motocicleta.',
   ),
@@ -35,28 +40,33 @@ export const CLUTCH_CABLE_PROCEDURE: Procedure = {
     {
       id: 'clutch-step-measure',
       title: 'Meça a folga',
-      description: 'Meça no ponto indicado pela documentação técnica.',
+      description: 'Meça na extremidade do manete; o manual transcreve folga de 10–20 mm.',
       required: true,
     },
     {
       id: 'clutch-step-adjust',
       title: 'Faça o ajuste',
-      description: 'Use primeiro o ajustador do manete, sem exceder seu curso.',
+      description:
+        'Use o ajustador junto ao manete para correções menores e o ajustador inferior para correções maiores.',
       required: true,
     },
     {
       id: 'clutch-step-lock',
       title: 'Trave o ajuste',
-      description: 'Aperte as contraporcas e movimente o guidão.',
+      description: 'Aperte as contraporcas e verifique novamente a folga e o acionamento.',
       required: true,
     },
   ],
   technicalClaimIds: ['spec-clutch-free-play', 'spec-clutch-cable-routing'],
-  commonMistakes: ['Eliminar toda a folga.', 'Ignorar mudança de tensão ao virar o guidão.'],
+  commonMistakes: [
+    'Eliminar toda a folga.',
+    'Prosseguir quando não for possível obter o ajuste descrito no manual.',
+  ],
   finalChecks: [
     finalCheck('clutch-check-return', 'Manete retorna livremente'),
     finalCheck('clutch-check-freeplay', 'Folga conferida conforme documentação aplicável'),
     finalCheck('clutch-check-engagement', 'Acionamento progressivo observado'),
   ],
-  contentNote: 'Checklist demonstrativo — confirme a folga livre em documentação técnica.',
+  contentNote:
+    'Transcrito da seção “Embreagem” (págs. 16–17). A rota completa do cabo não é coberta e continua dependente do manual de serviço.',
 };

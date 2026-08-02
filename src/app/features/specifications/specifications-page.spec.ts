@@ -22,7 +22,7 @@ class MemoryStorage {
 describe('SpecificationsPage', () => {
   beforeEach(() => TestBed.resetTestingModule());
 
-  it('filters by status and applicability while preserving the A confirmar state', async () => {
+  it('shows transcribed citations and filters by review status and confirmed applicability', async () => {
     await TestBed.configureTestingModule({
       imports: [SpecificationsPage],
       providers: [
@@ -33,8 +33,8 @@ describe('SpecificationsPage', () => {
     const fixture = TestBed.createComponent(SpecificationsPage);
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('A confirmar');
-    expect(fixture.nativeElement.textContent).toContain('Página ou seção: não informada');
-    expect(fixture.nativeElement.textContent).toContain('Manual de serviço');
+    expect(fixture.nativeElement.textContent).toContain('página 22 · seção Óleo do motor');
+    expect(fixture.nativeElement.textContent).toContain('Transcrito');
 
     const component = fixture.componentInstance as unknown as {
       filterForm: {
@@ -51,8 +51,9 @@ describe('SpecificationsPage', () => {
     component.filterForm.controls.status.setValue('all');
     component.filterForm.controls.onlyApplicable.setValue(true);
     fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('16 itens encontrados');
     expect(fixture.nativeElement.textContent).toContain(
-      'aplicabilidade do catálogo ainda é desconhecida',
+      'Confirmada para a configuração selecionada',
     );
   });
 

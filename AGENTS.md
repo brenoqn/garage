@@ -11,9 +11,10 @@ interface, metadados e documentação.
 2. Use componentes standalone e preserve a divisão `core`, `shared`, `features` e `data`.
 3. Não invente especificações mecânicas, torques, capacidades, folgas, pressões, códigos de
    peças ou intervalos oficiais.
-4. Todo valor técnico precisa registrar uma fonte verificável. Se não estiver confirmado,
-   exiba `A confirmar`, mantenha a fonte esperada e exclua o item de alertas e contagens
-   operacionais.
+4. Todo valor técnico precisa registrar uma fonte verificável. Uma transcrição ainda não revisada
+   deve ser marcada explicitamente como `transcribed` e excluída de alertas e contagens
+   operacionais. Se a informação não estiver na fonte, exiba `A confirmar` e mantenha a fonte
+   esperada.
 5. Mantenha cálculos, migrações e validações fora de templates e componentes de apresentação.
    Prefira funções puras ou serviços pequenos e cubra mudanças de regra com testes.
 6. Trate `LocalStorage` como detalhe de infraestrutura. Recursos devem depender da abstração
@@ -60,7 +61,14 @@ interface, metadados e documentação.
     fonte está correta; a resolução deve ser editorial e rastreável.
 28. Reorganizar arquivos do catálogo não pode alterar slugs, IDs de etapas, warnings ou
     verificações finais usados por execuções existentes.
-29. Antes de concluir qualquer alteração, execute e corrija:
+29. O Manual do Proprietário Honda NX200 `D2203-MAN-0181`, arquivo oficial
+    `NX 200 1994.pdf`, tem aplicabilidade confirmada pelo proprietário do projeto para a NX200
+    brasileira de 1997. O ano no nome do arquivo não é conflito automático. Essa decisão não
+    aprova transcrições nem substitui revisão técnica.
+30. Claims transcritas exigem página e seção. Não extrapole o manual do proprietário para
+    desmontagem ou reparos ausentes; continue exigindo manual de serviço para torques,
+    tolerâncias internas, diagramas completos e desmontagem avançada.
+31. Antes de concluir qualquer alteração, execute e corrija:
 
 ```bash
 npm run format:check

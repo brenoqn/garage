@@ -2,8 +2,9 @@
 
 ## Regra principal
 
-Nunca inferir, completar ou aproximar valores mecânicos da Honda NX200. Se uma informação não
-estiver confirmada em documentação confiável e aplicável, publique `A confirmar`.
+Nunca inferir, completar ou aproximar valores mecânicos da Honda NX200. Sem fonte verificável,
+publique `A confirmar`. Uma transcrição localizada ainda sem revisão pode exibir o valor apenas
+com estado `transcribed`, aviso explícito e bloqueio de uso operacional.
 
 ## Fonte, citação e claim
 
@@ -11,10 +12,10 @@ Uma fonte registra metadados do documento: tipo, título, editor ou fabricante, 
 idioma, mercado e disponibilidade. Ela não contém o arquivo integral nem autoriza sua
 redistribuição.
 
-Uma citação precisa apontar para uma fonte cadastrada e para uma localização verificável:
-página positiva, página rotulada, seção, tabela ou figura. “Manual da moto” não é citação
-suficiente. Notas de trecho devem resumir o contexto, sem reproduzir extensamente conteúdo
-protegido.
+Uma citação de conteúdo `transcribed`, `under-review` ou `confirmed` precisa apontar para uma
+fonte cadastrada e registrar **página e seção**. Tabela ou figura complementam a localização
+quando pertinentes. “Manual da moto” não é citação suficiente. Notas de trecho devem resumir o
+contexto, sem reproduzir extensamente conteúdo protegido.
 
 Uma claim representa uma única afirmação técnica e possui ID estável, tópico, valor estruturado,
 aplicabilidade, citações, revisões e estado editorial. Valores podem ser escalares, faixas,
@@ -29,6 +30,20 @@ Fontes preferidas, em ordem:
 
 Fóruns, vídeos, lojas e conteúdo sem autoria técnica podem inspirar tópicos, mas não confirmam
 valores.
+
+## Aplicabilidade documental e revisão
+
+A decisão de que uma fonte se aplica à motocicleta é independente da revisão de cada transcrição.
+Registre a decisão em `TechnicalSourceApplicabilityDecision`, com responsável, data, escopo e
+fundamento. Depois, cada claim continua seguindo seu próprio ciclo editorial.
+
+O proprietário do projeto confirmou que o Manual do Proprietário Honda NX200, código
+`D2203-MAN-0181` e arquivo oficial `NX 200 1994.pdf`, se aplica ao conjunto técnico da NX200
+brasileira de 1997. A diferença entre o ano no nome do arquivo e o ano da motocicleta não é, por si
+só, um conflito. Somente uma diferença concreta no conteúdo deve gerar estado `conflicting`.
+
+Essa confirmação não transforma claims `transcribed` em `confirmed`. Revisão aprovada continua
+obrigatória antes de uso operacional.
 
 ## Estados editoriais
 
@@ -84,6 +99,12 @@ Use verbos de ação e uma tarefa por etapa. Explique quando parar e procurar um
 Dificuldade descreve complexidade; `riskLevel` descreve a consequência potencial de erro.
 Conteúdo de risco alto ou crítico com claims pendentes exige advertência reforçada. Conflito
 técnico bloqueia uso operacional.
+
+O manual do proprietário pode sustentar inspeções, ajustes e manutenção básica expressamente
+descritos nele. Não o extrapole para desmontagem ou reparos ausentes. Torques, tolerâncias
+internas, diagramas completos e desmontagem avançada continuam exigindo manual de serviço; um
+valor de torque presente no manual do proprietário pode ser transcrito, mas deve manter a
+necessidade de confronto com o manual de serviço.
 
 A conclusão registra apenas que o usuário percorreu o checklist. Ela não cria serviço, não
 confirma a execução mecânica e não substitui avaliação profissional. Para sistemas críticos, use

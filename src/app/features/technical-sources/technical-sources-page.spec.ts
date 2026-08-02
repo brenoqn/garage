@@ -18,7 +18,7 @@ class MemoryStorage {
 }
 
 describe('TechnicalSourcesPage', () => {
-  it('exposes source metadata without presenting unavailable documents as downloads', async () => {
+  it('separates source applicability from pending technical review', async () => {
     await TestBed.configureTestingModule({
       imports: [TechnicalSourcesPage],
       providers: [{ provide: LocalStorageAdapter, useValue: new MemoryStorage() }],
@@ -27,9 +27,13 @@ describe('TechnicalSourcesPage', () => {
     fixture.detectChanges();
     const text = fixture.nativeElement.textContent;
     expect(text).toContain('Manual do proprietário');
-    expect(text).toContain('Não disponível');
+    expect(text).toContain('Disponível');
     expect(text).toContain('Citações localizadas');
     expect(text).toContain('A confirmar');
+    expect(text).toContain('Aplicabilidade documental confirmada');
+    expect(text).toContain('não equivale à revisão técnica das transcrições');
+    expect(text).toContain('D2203-MAN-0181');
+    expect(fixture.nativeElement.querySelector('a[href*="honda.com.br"]')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('a[download]')).toBeNull();
   });
 });

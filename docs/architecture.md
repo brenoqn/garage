@@ -38,10 +38,13 @@ data/nx200/
 └── nx200-catalog.ts      # composição validada
 ```
 
-`TechnicalDocumentSource` registra somente metadados e disponibilidade; não incorpora cópias de
-manuais. `TechnicalCitation` localiza página, seção, tabela ou figura. `TechnicalClaim` unifica
-valor estruturado, estado editorial, aplicabilidade, citações, revisões e eventual supersessão.
-`ContentRevision` é a versão editorial do procedimento e não se relaciona ao `schemaVersion`.
+`TechnicalDocumentSource` registra metadados, disponibilidade, URL oficial e decisões de
+aplicabilidade; não incorpora cópias de manuais. Uma `TechnicalSourceApplicabilityDecision`
+identifica quem confirmou o escopo documental e por qual fundamento, sem aprovar transcrições.
+`TechnicalCitation` localiza página e seção, além de tabela ou figura quando pertinente.
+`TechnicalClaim` unifica valor estruturado, estado editorial, aplicabilidade, citações, revisões e
+eventual supersessão. `ContentRevision` é a versão editorial do procedimento e não se relaciona
+ao `schemaVersion`.
 
 O modelo persistido `MaintenancePlanItem.technicalSource` permanece como projeção de
 compatibilidade dos schemas 1–3. Ele pode carregar `claimIds`, mas não duplica documentos,
@@ -60,9 +63,11 @@ mesmo tópico, valores diferentes e aplicabilidade sobreposta são relatados; o 
 uma fonte vencedora. `npm run validate:content` executa o catálogo real e retorna erro para
 violações bloqueantes.
 
-Os registros atuais são placeholders de documentos indisponíveis. Todas as claims estão
-`demonstrative`, sem citações ou revisões, com valor `A confirmar`. Não há claim confirmada nem
-conflito de produção.
+O manual do proprietário `D2203-MAN-0181` está registrado como fonte disponível por URL oficial.
+Sua aplicabilidade à NX200 brasileira de 1997 foi confirmada pelo proprietário do projeto em uma
+decisão independente. Há 27 claims `transcribed` com página e seção e quatro placeholders
+`demonstrative` com `A confirmar`. Nenhuma claim possui revisão aprovada ou estado `confirmed` e
+não há conflito de produção.
 
 ## Estado persistido
 
@@ -86,9 +91,15 @@ persiste apenas dados do usuário e referências a IDs estáveis do catálogo. A
 recusa IDs desconhecidos, duplicados, vínculos quebrados e mais de uma execução ativa do mesmo
 procedimento para a mesma motocicleta.
 
-A Sprint 4 não mudou essa estrutura: o schema permanece 3 e nenhuma migração vazia foi criada.
+A incorporação do manual não mudou essa estrutura: o schema permanece 3 e nenhuma migração vazia
+foi criada.
 Backups continuam contendo somente moto, plano, serviços, odômetro, execuções, preferências e
 setup. Documentos, claims, citações, revisões e procedimentos ficam fora do arquivo.
+
+O seed do plano foi alinhado aos intervalos transcritos, mas continua `needs-confirmation`.
+Estados já persistidos não são reescritos silenciosamente enquanto essas claims não possuem
+revisão aprovada. Uma sincronização futura de intervalos confirmados deverá ser explícita e
+preservar execuções e personalizações do usuário.
 
 ## Migração e recuperação
 
@@ -166,19 +177,20 @@ que não dependem de posição ou texto. Testes garantem slugs e IDs únicos, n�
 válidas. Campos para imagens futuras existem, mas nenhuma imagem mecânica foi adicionada.
 
 Slugs, etapas, alertas e verificações possuem uma lista protegida por teste para impedir que a
-reorganização do catálogo invalide execuções existentes. Todo valor técnico atual permanece
-`demonstrative` e `A confirmar`; a projeção persistida do plano continua
-`needs-confirmation`. Checklists de risco alto ou crítico recebem advertência reforçada, e a
-interface nunca afirma segurança ou aprovação mecânica. Conflito explícito bloqueia conclusão
-operacional.
+reorganização do catálogo invalide execuções existentes. Procedimentos estão em versão editorial
+2 e estado `transcribed`; dados ausentes continuam `A confirmar`. A projeção persistida do plano
+permanece `needs-confirmation`, pois ainda não existe revisão aprovada. Checklists de risco alto ou
+crítico recebem advertência reforçada, e a interface nunca afirma segurança ou aprovação
+mecânica. Conflito explícito bloqueia conclusão operacional.
 
 ## Transparência na interface
 
-`/technical-sources` mostra documento, tipo, editor, edição, mercado, disponibilidade, citações e
-conteúdos relacionados, sem download não autorizado. `/specifications` associa cada item a uma
-claim e oferece filtros por sistema, estado, ano e aplicabilidade. Procedimento e preparação
-mostram versão editorial, risco, aplicabilidade, contagens pendentes e acesso às fontes. O modo
-oficina mantém apenas um vínculo compacto para não competir com a etapa atual.
+`/technical-sources` mostra documento, tipo, editor, código, edição, mercado, disponibilidade,
+decisão de aplicabilidade, citações e conteúdos relacionados, sem hospedar o PDF.
+`/specifications` associa cada item a uma claim e oferece filtros por sistema, estado, ano e
+aplicabilidade. Procedimento e preparação mostram versão editorial, risco, aplicabilidade,
+contagens pendentes e acesso às fontes. O modo oficina mantém apenas um vínculo compacto para não
+competir com a etapa atual.
 
 ## Modo oficina, temporizador e Wake Lock
 
@@ -207,9 +219,10 @@ básica offline. O manifesto usa **Garage** e inicia em `/dashboard`. `npm run b
 ## Limitações atuais
 
 - um navegador, uma Honda NX200 e LocalStorage sem criptografia ou sincronização;
-- conteúdo mecânico demonstrativo ainda sem validação documental;
-- ano de fabricação, ano-modelo, mercado, variante e código do motor ainda não verificados;
-- nenhuma fonte real, citação localizada, revisão aprovada ou claim confirmada;
+- transcrições do manual do proprietário ainda sem revisão técnica aprovada;
+- variante, código do motor e identidade física da motocicleta ainda não verificados;
+- manual de serviço e catálogo de peças ainda indisponíveis;
+- nenhuma claim confirmada para uso operacional;
 - temporizadores não persistem após fechar completamente o navegador;
 - Wake Lock depende de suporte e permissão do navegador;
 - sem imagens, anexos, exclusão de execuções, push, backend ou autenticação.

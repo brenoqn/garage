@@ -34,9 +34,9 @@ interface SourceView {
       <section class="source-warning" role="note">
         <span aria-hidden="true">i</span>
         <p>
-          O repositório não contém manuais, transcrições ou páginas verificáveis. Os registros
-          abaixo identificam os documentos que ainda precisam ser obtidos legalmente; não são links
-          para download nem evidência técnica.
+          O manual do proprietário foi localizado no site oficial da Honda e sua aplicabilidade à
+          NX200 brasileira de 1997 foi confirmada pelo proprietário do projeto. As transcrições
+          continuam aguardando revisão técnica independente.
         </p>
       </section>
 
@@ -48,7 +48,7 @@ interface SourceView {
                 <p class="eyebrow">{{ sourceTypeLabel(item.source.type) }}</p>
                 <h2>{{ item.source.title }}</h2>
               </div>
-              <span class="editorial-badge" data-status="unavailable">
+              <span class="editorial-badge" [attr.data-status]="item.source.availability">
                 {{ availabilityLabel(item.source.availability) }}
               </span>
             </div>
@@ -60,6 +60,10 @@ interface SourceView {
               <div>
                 <dt>Edição</dt>
                 <dd>{{ item.source.edition ?? 'A confirmar' }}</dd>
+              </div>
+              <div>
+                <dt>Código do documento</dt>
+                <dd>{{ item.source.documentCode ?? 'A confirmar' }}</dd>
               </div>
               <div>
                 <dt>Ano</dt>
@@ -78,6 +82,34 @@ interface SourceView {
                 <dd>{{ item.expectedClaims.length }}</dd>
               </div>
             </dl>
+            @if (item.source.url) {
+              <p>
+                <a
+                  class="text-button"
+                  [href]="item.source.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Abrir fonte oficial
+                </a>
+                @if (item.source.accessedAt) {
+                  <small>Consultada em {{ item.source.accessedAt }}.</small>
+                }
+              </p>
+            }
+            @for (decision of item.source.applicabilityDecisions ?? []; track decision.id) {
+              <div class="source-applicability" role="note">
+                <strong>Aplicabilidade documental confirmada</strong>
+                <p>{{ decision.applicability.notes }}</p>
+                <small>
+                  {{ decision.decidedBy }} · {{ decision.decidedAt }} · {{ decision.basis }}
+                </small>
+                <p>
+                  Esta decisão não equivale à revisão técnica das transcrições e não confirma
+                  automaticamente valores.
+                </p>
+              </div>
+            }
             @if (item.source.notes) {
               <p>{{ item.source.notes }}</p>
             }

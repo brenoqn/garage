@@ -1,5 +1,10 @@
 import { Procedure } from '../../../core/models/procedure.model';
-import { finalCheck, pendingEditorialMetadata, resource, warning } from './procedure-data.helpers';
+import {
+  finalCheck,
+  resource,
+  transcribedEditorialMetadata,
+  warning,
+} from './procedure-data.helpers';
 
 export const CHAIN_MAINTENANCE_PROCEDURE: Procedure = {
   slug: 'ajuste-lubrificacao-corrente',
@@ -8,7 +13,7 @@ export const CHAIN_MAINTENANCE_PROCEDURE: Procedure = {
   description:
     'Inspeção da transmissão final, limpeza cuidadosa, lubrificação e conferência do alinhamento.',
   difficulty: 'moderate',
-  ...pendingEditorialMetadata(
+  ...transcribedEditorialMetadata(
     'high',
     'Ajuste ou alinhamento incorreto pode afetar a transmissão e o controle da motocicleta.',
   ),
@@ -19,8 +24,8 @@ export const CHAIN_MAINTENANCE_PROCEDURE: Procedure = {
     resource('chain-tool-ruler', 'Régua ou medidor'),
   ],
   materials: [
-    resource('chain-material-cleaner', 'Limpador compatível'),
-    resource('chain-material-lubricant', 'Lubrificante para corrente'),
+    resource('chain-material-cleaner', 'Querosene para limpeza, conforme o manual'),
+    resource('chain-material-lubricant', 'Óleo para transmissão SAE 90, conforme o manual'),
   ],
   safetyWarnings: [
     warning(
@@ -42,25 +47,28 @@ export const CHAIN_MAINTENANCE_PROCEDURE: Procedure = {
     {
       id: 'chain-step-clean',
       title: 'Limpe',
-      description: 'Remova a sujeira com produto e escova adequados.',
+      description:
+        'Limpe somente com querosene e enxugue completamente; não use vapor, alta pressão ou solvente forte.',
       required: true,
     },
     {
       id: 'chain-step-measure',
       title: 'Meça a folga',
-      description: 'Meça no ponto indicado pelo manual e compare somente com o valor confirmado.',
+      description:
+        'Meça na região central inferior e verifique vários pontos; o manual transcreve 35–45 mm.',
       required: true,
     },
     {
       id: 'chain-step-align',
       title: 'Ajuste e alinhe',
-      description: 'Faça ajustes iguais nos dois lados e confirme o alinhamento da roda.',
+      description:
+        'Faça o mesmo número de voltas nos dois lados, alinhe as marcas e confira novamente a folga e o freio traseiro.',
       required: true,
     },
     {
       id: 'chain-step-lubricate',
       title: 'Lubrifique',
-      description: 'Aplique uma camada uniforme e retire o excesso.',
+      description: 'Aplique óleo para transmissão SAE 90 após a limpeza e secagem completas.',
       required: true,
     },
   ],
@@ -68,7 +76,7 @@ export const CHAIN_MAINTENANCE_PROCEDURE: Procedure = {
   commonMistakes: [
     'Deixar a corrente excessivamente tensionada.',
     'Confiar apenas nas marcas sem conferir o alinhamento.',
-    'Lubrificar sobre sujeira acumulada.',
+    'Usar vapor, água quente sob alta pressão, solvente forte ou lubrificante em aerossol.',
   ],
   finalChecks: [
     finalCheck('chain-check-slack', 'Folga conferida conforme documentação aplicável'),
@@ -76,5 +84,6 @@ export const CHAIN_MAINTENANCE_PROCEDURE: Procedure = {
     finalCheck('chain-check-fasteners', 'Fixadores conferidos'),
     finalCheck('chain-check-excess', 'Sem excesso aparente de produto'),
   ],
-  contentNote: 'Checklist demonstrativo — valores técnicos permanecem pendentes de validação.',
+  contentNote:
+    'Transcrito da seção “Corrente de transmissão” (págs. 55–60). Ajuste e torque aguardam revisão técnica; substituição deve ser encaminhada à concessionária.',
 };
