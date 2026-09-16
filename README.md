@@ -111,10 +111,10 @@ etapa. O backup é a forma disponível de transferir dados entre navegadores ou 
 ## Migração de origem
 
 O `LocalStorage` pertence ao domínio onde os dados foram registrados. Antes de mudar de
-hospedagem, exporte um backup JSON em Ajustes no endereço antigo. Quando
-`https://garage.bqtech.com.br` estiver disponível, abra o Garage nesse endereço e importe o
-arquivo em Ajustes, revisando o resumo e confirmando a substituição. A troca de domínio não
-transfere os dados automaticamente; mantenha o backup até conferir a restauração.
+hospedagem, exporte um backup JSON em Ajustes no endereço antigo. Na origem de produção,
+`https://garage.bqtech.com.br`, importe o arquivo em Ajustes, revise o resumo e confirme a
+substituição. A troca de domínio não transfere os dados automaticamente; mantenha o backup até
+conferir a restauração.
 
 ## Dados técnicos
 
@@ -157,3 +157,5 @@ Consulte [docs/architecture.md](docs/architecture.md) para decisões técnicas,
 O processo editorial está em [docs/technical-source-ingestion.md](docs/technical-source-ingestion.md),
 a política de revisão em [docs/technical-review-policy.md](docs/technical-review-policy.md) e o
 estado das variantes em [docs/nx200-supported-variants.md](docs/nx200-supported-variants.md).
+O contrato de container, CI e produção BQTECH está em
+[docs/BQTECH-DEPLOYMENT.md](docs/BQTECH-DEPLOYMENT.md).
