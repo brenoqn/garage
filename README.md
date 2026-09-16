@@ -108,6 +108,14 @@ futuras são recusadas. Serviços demonstrativos reconstruíveis e suas referên
 O aplicativo não possui backend, conta de usuário, sincronização ou notificações push nesta
 etapa. O backup é a forma disponível de transferir dados entre navegadores ou dispositivos.
 
+## Migração de origem
+
+O `LocalStorage` pertence ao domínio onde os dados foram registrados. Antes de mudar de
+hospedagem, exporte um backup JSON em Ajustes no endereço antigo. Quando
+`https://garage.bqtech.com.br` estiver disponível, abra o Garage nesse endereço e importe o
+arquivo em Ajustes, revisando o resumo e confirmando a substituição. A troca de domínio não
+transfere os dados automaticamente; mantenha o backup até conferir a restauração.
+
 ## Dados técnicos
 
 O catálogo técnico é estático e separado dos dados pessoais. Ele estrutura documentos,

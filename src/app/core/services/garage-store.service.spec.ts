@@ -319,7 +319,9 @@ describe('GarageStore', () => {
     });
     expect(fuel).not.toBeNull();
     expect(store.motorcycle().currentMileage).toBe(29_000);
-    expect(store.odometerHistory()[0]).toMatchObject({
+    expect(
+      store.odometerHistory().find((record) => record.fuelRecordId === fuel?.id),
+    ).toMatchObject({
       source: 'fuel',
       fuelRecordId: fuel?.id,
       mileage: 29_000,
