@@ -80,6 +80,19 @@
 
 ## Próximas iterações
 
+### Fase 3 — backend isolado (código implementado, sem ativação)
+
+- [x] contratos schema 4 e regras puras necessários ao backend compartilhados sem Angular;
+- [x] API mínima com startup separado, health, readiness e erros seguros;
+- [x] migration relacional versionada e runner com checksum, lock e reexecução segura;
+- [x] repositories específicos, transações, revisão e idempotência;
+- [x] casos de uso iniciais e snapshot remoto sem seed demonstrativo;
+- [x] testes em PostgreSQL descartável para migration, rollback, constraints, API e concorrência;
+- [ ] aplicar migration no `garage_db` somente após checkpoint e autorização;
+- [ ] comprovar barreira de acesso e rota do domínio antes de publicar a API;
+- [ ] integrar o Angular à API depois de estabilizar os contratos;
+- [ ] implementar e validar importação explícita do backup local para destino vazio.
+
 ### Sprint 6 recomendada — revisão das primeiras transcrições
 
 - revisar tecnicamente as transcrições de bateria ou vela como primeiro domínio de menor risco;

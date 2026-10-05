@@ -35,6 +35,9 @@ yarn-error.log
 .env
 .env.*
 !.env.example
+.secrets/
+*.pem
+*.key
 /.angular/cache
 .sass-cache/
 /connect.lock

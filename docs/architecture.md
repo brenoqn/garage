@@ -2,7 +2,7 @@
 
 ## Visão geral
 
-Garage é uma PWA Angular 22 standalone, estrita e sem backend. Rotas lazy são exibidas em um
+Garage é uma PWA Angular 22 standalone, estrita. Rotas lazy são exibidas em um
 shell responsivo. Signals representam o estado local e formulários reativos tratam entradas e
 confirmações.
 
@@ -18,10 +18,41 @@ StoragePort
 LocalStorageAdapter (`garage_state`)
 ```
 
-`core/models` define contratos; `core/domain` contém regras e validações sem Angular;
+`shared/garage.ts` define os contratos persistentes; `core/models` preserva os imports do
+frontend por reexportação. `core/domain` contém regras e validações sem Angular;
 `core/services` coordena estado e APIs opcionais; `core/storage` isola o LocalStorage;
 `features` contém páginas standalone; `data` mantém o catálogo estático da Honda NX200; e
 `shared` abriga componentes reutilizáveis.
+
+### Backend da Fase 3 (ainda sem ativação pública)
+
+O repositório também contém uma API Node.js 24/TypeScript estrito/Express 5 com `pg`, em
+`server/`. O frontend ainda usa LocalStorage e não chama essa API. Os contratos de dados do
+schema 4 estão em `shared/garage.ts`; os imports antigos de `core/models` reexportam esses
+tipos. As regras puras de odômetro, cronologia de serviço, combustível e checklist foram
+extraídas para `shared/`. As regras de execução de procedimento e a validação completa do
+estado seguem em `core/domain` e são reutilizadas pelo backend sem dependência Angular.
+
+```text
+Angular (LocalStorage, ainda ativo)       Garage API (somente código/testes)
+                                               ↓
+                                         casos de uso e repositories
+                                               ↓
+                                          garage_user / garage_db
+```
+
+O banco remoto não armazena um JSON de `GarageState`. `GET /api/garage` monta o snapshot
+schema 4 a partir das tabelas relacionais sob leitura consistente; antes do setup, responde
+`not-configured`, revisão `0` e sem moto ou dados demonstrativos. Depois distingue
+`configured-empty` e `configured-with-history`. A revisão é separada de
+`schemaVersion`. Escritas exigem `expectedRevision` e `Idempotency-Key` e gravam o recibo
+na mesma transação dos dados. O frontend ainda não foi adaptado.
+
+O executor em `server/src/persistence/migrate.ts` aplica SQL versionado por comando explícito,
+com checksum e advisory lock; o startup da API não executa migrations. A migration
+`001_initial.sql` foi testada somente em PostgreSQL descartável. Nenhuma migration foi
+aplicada ao `garage_db` da BQTECH nesta fase. A publicação HTTP, barreira de acesso e
+integração do frontend continuam pendentes.
 
 ## Catálogo técnico editorial
 

@@ -10,6 +10,12 @@
     "test": "ng test",
     "test:ci": "ng test --watch=false",
     "validate:content": "ng test --watch=false --include=src/app/core/domain/nx200-content.validation.spec.ts",
+    "server:typecheck": "tsc --project tsconfig.server.json",
+    "server:build": "esbuild server/src/index.ts server/src/migrate-cli.ts --bundle --platform=node --target=node24 --format=esm --packages=external --out-extension:.js=.mjs --outdir=dist/garage-api",
+    "server:start": "tsx server/src/index.ts",
+    "server:run": "node dist/garage-api/index.mjs",
+    "server:migrate": "tsx server/src/migrate-cli.ts",
+    "server:test": "vitest run server",
     "lint": "ng lint",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
@@ -24,6 +30,8 @@
     "@angular/platform-browser": "^22.1.0",
     "@angular/router": "^22.1.0",
     "@angular/service-worker": "^22.1.0",
+    "express": "^5.2.1",
+    "pg": "^8.23.1",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },
@@ -32,12 +40,22 @@
     "@angular/cli": "^22.1.2",
     "@angular/compiler-cli": "^22.1.0",
     "@eslint/js": "^10.0.1",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.1",
+    "@types/pg": "^8.23.1",
+    "@types/supertest": "^6.0.3",
     "angular-eslint": "22.1.0",
+    "esbuild": "^0.28.2",
     "eslint": "^10.6.0",
     "jsdom": "^28.0.0",
     "prettier": "^3.8.1",
+    "supertest": "^7.3.1",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.2",
     "typescript-eslint": "8.62.1",
     "vitest": "^4.0.8"
+  },
+  "overrides": {
+    "qs": "^6.16.0"
   }
 }

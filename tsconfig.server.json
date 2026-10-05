@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": [
+    "server/src/**/*.ts",
+    "shared/**/*.ts",
+    "src/app/core/domain/**/*.ts",
+    "src/app/core/models/**/*.ts",
+    "src/app/data/nx200/**/*.ts"
+  ],
+  "exclude": ["**/*.spec.ts"]
+}

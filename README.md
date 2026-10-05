@@ -12,6 +12,9 @@ explícita de quando parar e procurar um profissional.
 O nome do produto é **Garage**. “Honda NX200” identifica somente a primeira motocicleta
 suportada.
 
+O repositório contém uma API PostgreSQL em `server/`, ainda sem deploy e sem integração com o
+Angular. O aplicativo publicado continua no modo local.
+
 ## O que está incluído
 
 - dashboard da motocicleta com quilometragem, próxima prioridade e alertas detalhados;
@@ -67,6 +70,28 @@ npm run test:ci
 npm run validate:content
 npm run build
 ```
+
+Para verificar o backend sem iniciar servidor:
+
+```bash
+npm run server:typecheck
+npm run server:build
+npm run server:test
+```
+
+Os testes PostgreSQL de integração só executam com
+`GARAGE_TEST_DATABASE_URL` apontando para um banco descartável local via loopback e
+`GARAGE_TEST_DB_ISOLATED=1`. Eles recriam o schema `public` nesse banco de teste; nunca
+aponte essas variáveis para `garage_db` de produção.
+
+O servidor recebe `DATABASE_URL` ou `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`,
+`POSTGRES_USER` e `POSTGRES_PASSWORD` do ambiente. A referência sem segredos está em
+`.env.example`. Na BQTECH, o arquivo de credenciais permanece somente no servidor, fora
+do repositório. O backend não lê `.env` por conta própria; o processo que o inicia deve
+injetar as variáveis. `npm run server:migrate` é um comando separado do startup e não deve
+ser executado no banco BQTECH antes de autorização específica.
+Após `npm run server:build`, `npm run server:run` inicia o bundle compilado. O pacote de
+deployment e a exposição da rota ainda não foram definidos.
 
 O build de produção é gerado em `dist/garage/browser`.
 

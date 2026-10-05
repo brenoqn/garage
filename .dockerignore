@@ -16,5 +16,11 @@ __screenshots__
 *.log
 .env
 .env.*
+**/.env
+**/.env.*
+**/.secrets
+**/.secrets/**
+**/*.pem
+**/*.key
 .DS_Store
 Thumbs.db
