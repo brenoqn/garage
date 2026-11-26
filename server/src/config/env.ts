@@ -1,16 +1,53 @@
 import type { PoolConfig } from 'pg';
+import type { AccessConfig } from '../http/access';
 
-export interface ServerConfig {
+export interface DatabaseConfig {
   readonly database: PoolConfig;
-  readonly port: number;
   readonly expectedUser: string;
   readonly expectedDatabase: string;
+}
+
+export interface ServerConfig extends DatabaseConfig {
+  readonly port: number;
+  readonly host: string;
+  readonly access: AccessConfig;
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
   const value = env[name];
   if (!value?.trim()) throw new Error(`Missing required configuration: ${name}`);
   return value;
+}
+
+const LOOPBACK_HOSTS = ['127.0.0.1', '::1', 'localhost'];
+
+/**
+ * A API só sobe com Cloudflare Access configurado. A única exceção é o desenvolvimento local
+ * explícito (`GARAGE_ACCESS_DISABLED=local-only`), que exige escutar somente em loopback.
+ */
+function accessConfig(env: NodeJS.ProcessEnv, host: string): AccessConfig {
+  const teamDomain = env['CF_ACCESS_TEAM_DOMAIN']?.trim().toLowerCase();
+  const audience = env['CF_ACCESS_AUD']?.trim();
+  if (teamDomain || audience) {
+    if (!teamDomain || !/^[a-z0-9-]+\.cloudflareaccess\.com$/.test(teamDomain)) {
+      throw new Error('Invalid configuration: CF_ACCESS_TEAM_DOMAIN');
+    }
+    if (!audience || !/^[A-Za-z0-9]{16,128}$/.test(audience)) {
+      throw new Error('Invalid configuration: CF_ACCESS_AUD');
+    }
+    const allowedEmails = (env['CF_ACCESS_ALLOWED_EMAILS'] ?? '')
+      .split(',')
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean);
+    return { mode: 'cloudflare', teamDomain, audience, allowedEmails };
+  }
+  if (env['GARAGE_ACCESS_DISABLED'] === 'local-only') {
+    if (!LOOPBACK_HOSTS.includes(host)) {
+      throw new Error('GARAGE_ACCESS_DISABLED=local-only requires a loopback HOST');
+    }
+    return { mode: 'disabled-local' };
+  }
+  throw new Error('Missing required configuration: CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD');
 }
 
 function port(value: string, name: string): number {
@@ -21,7 +58,8 @@ function port(value: string, name: string): number {
   return parsed;
 }
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
+/** Somente o banco: usado pelo runner de migrations, que não atende HTTP. */
+export function loadDatabaseConfig(env: NodeJS.ProcessEnv = process.env): DatabaseConfig {
   let database: PoolConfig;
   let expectedUser: string;
   let expectedDatabase: string;
@@ -62,7 +100,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     };
   }
   return {
-    port: port(env['PORT'] ?? '3001', 'PORT'),
     expectedUser,
     expectedDatabase,
     database: {
@@ -74,5 +111,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
       query_timeout: 12000,
       application_name: 'garage-api',
     },
+  };
+}
+
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
+  const database = loadDatabaseConfig(env);
+  const host = env['HOST']?.trim() || '0.0.0.0';
+  return {
+    ...database,
+    port: port(env['PORT'] ?? '3001', 'PORT'),
+    host,
+    access: accessConfig(env, host),
   };
 }

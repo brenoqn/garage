@@ -158,7 +158,11 @@ import { GarageStore } from '../../core/services/garage-store.service';
               <a class="button button-secondary" [routerLink]="['/procedures', guide.slug]"
                 >Cancelar</a
               >
-              <button class="button button-primary" type="submit" [disabled]="!canStart()">
+              <button
+                class="button button-primary"
+                type="submit"
+                [disabled]="!canStart() || store.busy()"
+              >
                 Iniciar procedimento
               </button>
             </div>
@@ -222,11 +226,11 @@ export class ProcedurePreparePage {
     }
   }
 
-  protected start(): void {
+  protected async start(): Promise<void> {
     const procedure = this.procedure();
     if (!procedure || !this.canStart()) return;
     const values = this.warningControls.getRawValue();
-    const result = this.store.startProcedure(
+    const result = await this.store.startProcedure(
       procedure.slug,
       procedure.safetyWarnings.filter((warning) => values[warning.id]).map((warning) => warning.id),
     );

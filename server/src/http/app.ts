@@ -4,6 +4,7 @@ import type { Pool } from 'pg';
 import { GarageError } from '../../../shared/validation';
 import { GarageService } from '../application/garage-service';
 import { GarageRepository } from '../persistence/repositories';
+import { accessMiddleware, type AccessConfig, type KeyResolver } from './access';
 
 type WriteAction = (key: string, body: unknown) => Promise<unknown>;
 
@@ -11,12 +12,17 @@ export interface AppDependencies {
   readonly pool: Pool;
   readonly expectedUser: string;
   readonly expectedDatabase: string;
+  /** Obrigatório: não existe padrão aberto. */
+  readonly access: AccessConfig;
+  readonly accessKeyResolver?: KeyResolver;
 }
 
 export function createApp(dependencies: AppDependencies): Express {
   const app = express();
   const service = new GarageService(dependencies.pool);
   app.disable('x-powered-by');
+  // Backups completos podem passar do limite comum; só as rotas de importação aceitam mais.
+  app.use('/api/garage/import', express.json({ limit: '2mb', strict: true }));
   app.use(express.json({ limit: '256kb', strict: true }));
   app.use((request, response, next) => {
     const started = performance.now();
@@ -51,6 +57,7 @@ export function createApp(dependencies: AppDependencies): Express {
       client?.release();
     }
   });
+  app.use('/api', accessMiddleware(dependencies.access, dependencies.accessKeyResolver));
   app.get('/api/garage', async (_request, response) => {
     response.json(await service.getGarage());
   });
@@ -81,7 +88,15 @@ export function createApp(dependencies: AppDependencies): Express {
   write('/api/garage/procedures/finish', service.finishProcedureExecution.bind(service));
   write('/api/garage/procedures/cancel', service.cancelProcedureExecution.bind(service));
   write('/api/garage/procedures/restart', service.restartProcedureExecution.bind(service));
+  write('/api/garage/maintenance/items', service.createMaintenanceItem.bind(service));
+  write('/api/garage/maintenance/items/update', service.updateMaintenanceItem.bind(service));
+  write('/api/garage/maintenance/schedule', service.setMaintenanceSchedule.bind(service));
+  write('/api/garage/maintenance/items/remove', service.removeMaintenanceItem.bind(service));
   write('/api/garage/settings', service.updateSettings.bind(service));
+  app.post('/api/garage/import/preview', async (request, response) => {
+    response.json(await service.previewImport(request.body));
+  });
+  write('/api/garage/import', service.importBackup.bind(service));
 
   app.use((_request, response) =>
     response.status(404).json({ code: 'NOT_FOUND', message: 'Route not found' }),

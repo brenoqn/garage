@@ -150,7 +150,7 @@ import { GarageStore } from '../../core/services/garage-store.service';
             <button
               class="button button-primary"
               type="submit"
-              [disabled]="form.invalid || !!store.recovery()"
+              [disabled]="form.invalid || !!store.recovery() || store.busy()"
             >
               Salvar no histórico
             </button>
@@ -227,7 +227,7 @@ export class NewServicePage {
     });
   }
 
-  protected save(): void {
+  protected async save(): Promise<void> {
     if (this.form.invalid || !this.store.setup().completed) {
       this.form.markAllAsTouched();
       return;
@@ -235,7 +235,7 @@ export class NewServicePage {
 
     this.saveError.set('');
     const value = this.form.getRawValue();
-    const record = this.store.addService({
+    const record = await this.store.addService({
       title: value.title.trim(),
       date: value.date,
       mileage: value.mileage,

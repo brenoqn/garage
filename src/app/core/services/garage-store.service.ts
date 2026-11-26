@@ -1,4 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
+import type { GarageSnapshot, ImportPreview } from '../../../../shared/garage';
+import { ApiFailureKind, ApiResult, GarageApiClient } from '../api/garage-api.client';
 import {
   INITIAL_GARAGE_STATE,
   NX200_PROCEDURES,
@@ -10,6 +12,16 @@ import { NX200_PRE_RIDE_CHECKLIST } from '../../data/nx200/safety/nx200-pre-ride
 import { createGarageBackup } from '../domain/backup';
 import { validateNewFuelRecord } from '../domain/fuel-consumption';
 import { decodeStoredGarageState, validateGarageState } from '../domain/garage-state-migration';
+import {
+  applyUserSchedule,
+  createUserMaintenanceItem,
+  MaintenanceScheduleInput,
+  NewUserMaintenanceItem,
+  planItemRemovalError,
+  PlanResult,
+  updateUserMaintenanceItem,
+  USER_PLAN_ITEM_ID_PREFIX,
+} from '../domain/maintenance-plan';
 import { evaluateOdometerUpdate } from '../domain/odometer-policy';
 import {
   criticalProcedureCompletionBlocked,
@@ -33,6 +45,7 @@ import { buildSafetyCheckRecord, SafetyCheckResult } from '../domain/safety-chec
 import { ExpenseRecord, NewExpenseRecord } from '../models/expense-record.model';
 import { FuelRecord, NewFuelRecord } from '../models/fuel-record.model';
 import { GarageState, GarageStateRecovery, GarageTheme } from '../models/garage-state.model';
+import { MaintenancePlanItem } from '../models/maintenance.model';
 import { Motorcycle } from '../models/motorcycle.model';
 import {
   OdometerRecord,
@@ -47,6 +60,27 @@ import { LocalStorageAdapter } from '../storage/local-storage.adapter';
 import { StoragePort } from '../storage/storage.port';
 
 const STORAGE_KEY = 'state';
+/** Preferência de destino dos dados, separada de `garage_state` (chave física `garage_mode`). */
+const MODE_KEY = 'mode';
+
+export type GarageMode = 'local' | 'server';
+
+export type RemoteStatus =
+  | { readonly status: 'idle' }
+  | { readonly status: 'loading' }
+  | { readonly status: 'ready'; readonly snapshot: GarageSnapshot['status'] }
+  | {
+      readonly status: 'error';
+      readonly kind: ApiFailureKind | 'invalid';
+      readonly message: string;
+    };
+
+export type StoreResult<T = undefined> =
+  { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: string };
+
+type RemoteCommand =
+  | { readonly ok: true; readonly ids: readonly string[] }
+  | { readonly ok: false; readonly error: string };
 
 interface InitialLoad {
   readonly state: GarageState;
@@ -56,7 +90,16 @@ interface InitialLoad {
 @Injectable({ providedIn: 'root' })
 export class GarageStore {
   private readonly storage: StoragePort = inject(LocalStorageAdapter);
-  private readonly initialLoad = this.loadInitialState();
+  private readonly api = inject(GarageApiClient);
+  private readonly modeSignal = signal<GarageMode>(this.readMode());
+  private readonly initialLoad: InitialLoad =
+    this.modeSignal() === 'server' ? { state: INITIAL_GARAGE_STATE } : this.loadInitialState();
+  private readonly remoteSignal = signal<RemoteStatus>(
+    this.modeSignal() === 'server' ? { status: 'loading' } : { status: 'idle' },
+  );
+  private readonly pendingSignal = signal(0);
+  private readonly remoteLoadedSignal = signal(false);
+  private revision = '0';
   private readonly stateSignal = signal<GarageState>(this.initialLoad.state);
   private readonly recoverySignal = signal<GarageStateRecovery | undefined>(
     this.initialLoad.recovery,
@@ -112,8 +155,401 @@ export class GarageStore {
   readonly technicalClaims = signal(NX200_TECHNICAL_CLAIMS).asReadonly();
   readonly technicalSources = signal(NX200_TECHNICAL_SOURCES).asReadonly();
   readonly safetyChecklist = signal(NX200_PRE_RIDE_CHECKLIST).asReadonly();
+  /** `local`: dados só neste navegador. `server`: Garage API, com o navegador como leitor. */
+  readonly mode = this.modeSignal.asReadonly();
+  readonly remote = this.remoteSignal.asReadonly();
+  /** Há uma escrita aguardando o servidor. */
+  readonly busy = computed(() => this.pendingSignal() > 0);
+  /** No modo servidor, só existe estado para exibir depois do primeiro snapshot válido. */
+  readonly remoteLoaded = this.remoteLoadedSignal.asReadonly();
 
-  startProcedure(
+  constructor() {
+    if (this.modeSignal() === 'server') void this.refreshRemote();
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // Escritas públicas. No modo local resolvem na hora com as regras e a gravação existentes;
+  // no modo servidor enviam o comando e só publicam o estado confirmado pelo servidor.
+  // ---------------------------------------------------------------------------------------
+
+  async startProcedure(
+    procedureSlug: string,
+    acknowledgedWarningIds: readonly string[],
+  ): Promise<ProcedureExecutionResult> {
+    if (!this.isServer()) return this.localStartProcedure(procedureSlug, acknowledgedWarningIds);
+    const blocked = this.procedureMutationBlock();
+    if (blocked) return { ok: false, error: blocked };
+    const result = await this.runRemote('/api/garage/procedures/start', {
+      procedureSlug,
+      acknowledgedWarningIds,
+    });
+    return this.executionResult(result, result.ok ? result.ids[0] : undefined);
+  }
+
+  completeProcedureStep(executionId: string, stepId: string): Promise<ProcedureExecutionResult> {
+    if (!this.isServer())
+      return Promise.resolve(this.localCompleteProcedureStep(executionId, stepId));
+    return this.remoteProcedureUpdate(executionId, 'complete-step', stepId);
+  }
+
+  uncompleteProcedureStep(executionId: string, stepId: string): Promise<ProcedureExecutionResult> {
+    if (!this.isServer()) {
+      return Promise.resolve(this.localUncompleteProcedureStep(executionId, stepId));
+    }
+    return this.remoteProcedureUpdate(executionId, 'uncomplete-step', stepId);
+  }
+
+  skipOptionalProcedureStep(
+    executionId: string,
+    stepId: string,
+  ): Promise<ProcedureExecutionResult> {
+    if (!this.isServer()) {
+      return Promise.resolve(this.localSkipOptionalProcedureStep(executionId, stepId));
+    }
+    return this.remoteProcedureUpdate(executionId, 'skip-optional-step', stepId);
+  }
+
+  setProcedureFinalCheck(
+    executionId: string,
+    checkId: string,
+    completed: boolean,
+  ): Promise<ProcedureExecutionResult> {
+    if (!this.isServer()) {
+      return Promise.resolve(this.localSetProcedureFinalCheck(executionId, checkId, completed));
+    }
+    return this.remoteProcedureUpdate(executionId, 'set-final-check', checkId, completed);
+  }
+
+  async finishProcedure(executionId: string, note?: string): Promise<ProcedureExecutionResult> {
+    if (!this.isServer()) return this.localFinishProcedure(executionId, note);
+    const result = await this.runRemote('/api/garage/procedures/finish', { executionId, note });
+    return this.executionResult(result, executionId);
+  }
+
+  async cancelProcedure(executionId: string): Promise<ProcedureExecutionResult> {
+    if (!this.isServer()) return this.localCancelProcedure(executionId);
+    const result = await this.runRemote('/api/garage/procedures/cancel', { executionId });
+    return this.executionResult(result, executionId);
+  }
+
+  async restartProcedure(executionId: string): Promise<ProcedureExecutionResult> {
+    if (!this.isServer()) return this.localRestartProcedure(executionId);
+    const result = await this.runRemote('/api/garage/procedures/restart', { executionId });
+    return this.executionResult(result, result.ok ? result.ids[0] : undefined);
+  }
+
+  async updateMileage(request: OdometerUpdateRequest): Promise<OdometerUpdateResult> {
+    if (!this.isServer()) return this.localUpdateMileage(request);
+    const precheck = this.remoteOdometerPrecheck(request);
+    if (precheck.status !== 'updated') return precheck;
+    const result = await this.runRemote('/api/garage/odometer', {
+      mileage: request.mileage,
+      source: request.source,
+      note: request.note,
+      confirmedRegression: request.confirmedRegression,
+    });
+    return result.ok ? precheck : { ...precheck, status: 'blocked', impact: result.error };
+  }
+
+  async saveMotorcycle(
+    changes: Pick<Motorcycle, 'nickname' | 'year'>,
+    request: OdometerUpdateRequest,
+  ): Promise<OdometerUpdateResult> {
+    if (!this.isServer()) return this.localSaveMotorcycle(changes, request);
+    const precheck = this.remoteOdometerPrecheck(request);
+    if (precheck.status !== 'updated') return precheck;
+    const result = await this.runRemote('/api/garage/motorcycle', {
+      nickname: changes.nickname,
+      year: changes.year,
+      mileage: request.mileage,
+      source: request.source,
+      note: request.note,
+      confirmedRegression: request.confirmedRegression,
+    });
+    return result.ok ? precheck : { ...precheck, status: 'blocked', impact: result.error };
+  }
+
+  async completeSetup(
+    changes: Pick<Motorcycle, 'nickname' | 'year' | 'currentMileage'>,
+    note?: string,
+  ): Promise<boolean> {
+    if (!this.isServer()) return this.localCompleteSetup(changes, note);
+    const result = await this.runRemote('/api/garage/setup', { ...changes, note: note?.trim() });
+    return result.ok;
+  }
+
+  async addService(input: NewServiceRecord): Promise<ServiceRecord | null> {
+    if (!this.isServer()) return this.localAddService(input);
+    if (!this.setup().completed) return null;
+    const result = await this.runRemote('/api/garage/services', {
+      title: input.title,
+      date: input.date,
+      mileage: input.mileage,
+      procedureSlug: input.procedureSlug,
+      procedureExecutionId: input.procedureExecutionId,
+      maintenancePlanId: input.maintenancePlanId,
+      cost: input.cost,
+      parts: input.parts.map((part) => ({ name: part.name, quantity: part.quantity })),
+      notes: input.notes,
+    });
+    return this.created(result, this.stateSignal().serviceHistory);
+  }
+
+  async addFuel(input: NewFuelRecord): Promise<FuelRecord | null> {
+    if (!this.isServer()) return this.localAddFuel(input);
+    if (!this.setup().completed) return null;
+    if (!validateNewFuelRecord(input, this.motorcycle().currentMileage).valid) return null;
+    const result = await this.runRemote('/api/garage/fuel', {
+      fueledAt: input.fueledAt,
+      mileage: input.mileage,
+      liters: input.liters,
+      totalCost: input.totalCost,
+      fullTank: input.fullTank,
+      station: input.station,
+      notes: input.notes,
+      confirmedHistoricalMileage: input.confirmedHistoricalMileage,
+    });
+    return this.created(result, this.stateSignal().fuelHistory);
+  }
+
+  async addExpense(input: NewExpenseRecord): Promise<ExpenseRecord | null> {
+    if (!this.isServer()) return this.localAddExpense(input);
+    if (!this.setup().completed) return null;
+    const result = await this.runRemote('/api/garage/expenses', {
+      date: input.date,
+      title: input.title,
+      category: input.category,
+      amount: input.amount,
+      mileage: input.mileage,
+      notes: input.notes,
+    });
+    return this.created(result, this.stateSignal().expenseHistory);
+  }
+
+  async addOccurrence(input: NewOccurrenceRecord): Promise<OccurrenceRecord | null> {
+    if (!this.isServer()) return this.localAddOccurrence(input);
+    if (!this.setup().completed) return null;
+    const result = await this.runRemote('/api/garage/occurrences', {
+      occurredAt: input.occurredAt,
+      mileage: input.mileage,
+      title: input.title,
+      severity: input.severity,
+      notes: input.notes,
+    });
+    return this.created(result, this.stateSignal().occurrenceHistory);
+  }
+
+  async addSafetyCheck(input: NewSafetyCheckRecord): Promise<SafetyCheckResult> {
+    if (!this.isServer()) return this.localAddSafetyCheck(input);
+    if (!this.setup().completed) {
+      return { ok: false, error: 'Configure sua NX200 antes de salvar.' };
+    }
+    const result = await this.runRemote('/api/garage/safety-checks', {
+      checkedAt: input.checkedAt,
+      responses: input.responses.map((response) => ({
+        itemId: response.itemId,
+        status: response.status,
+      })),
+      notes: input.notes,
+    });
+    if (!result.ok) return result;
+    const record = this.created(result, this.stateSignal().safetyCheckHistory);
+    return record
+      ? { ok: true, record }
+      : { ok: false, error: 'A inspeção foi salva, mas não apareceu nos dados recarregados.' };
+  }
+
+  async addMaintenanceItem(
+    input: NewUserMaintenanceItem,
+  ): Promise<PlanResult<MaintenancePlanItem>> {
+    if (!this.isServer()) return this.localAddMaintenanceItem(input);
+    const blocked = this.planMutationBlock();
+    if (blocked) return { ok: false, error: blocked };
+    const result = await this.runRemote('/api/garage/maintenance/items', {
+      title: input.title,
+      category: input.category,
+      ...this.scheduleFields(input),
+    });
+    return this.planItemResult(result, result.ok ? result.ids[0] : undefined);
+  }
+
+  async updateMaintenanceItem(
+    itemId: string,
+    input: NewUserMaintenanceItem,
+  ): Promise<PlanResult<MaintenancePlanItem>> {
+    if (!this.isServer()) return this.localUpdateMaintenanceItem(itemId, input);
+    const blocked = this.planMutationBlock();
+    if (blocked) return { ok: false, error: blocked };
+    const result = await this.runRemote('/api/garage/maintenance/items/update', {
+      itemId,
+      title: input.title,
+      category: input.category,
+      ...this.scheduleFields(input),
+    });
+    return this.planItemResult(result, itemId);
+  }
+
+  async setMaintenanceSchedule(
+    itemId: string,
+    input: MaintenanceScheduleInput | null,
+  ): Promise<PlanResult<MaintenancePlanItem>> {
+    if (!this.isServer()) return this.localSetMaintenanceSchedule(itemId, input);
+    const blocked = this.planMutationBlock();
+    if (blocked) return { ok: false, error: blocked };
+    const result = await this.runRemote('/api/garage/maintenance/schedule', {
+      itemId,
+      schedule: input === null ? null : this.scheduleFields(input),
+    });
+    return this.planItemResult(result, itemId);
+  }
+
+  async removeMaintenanceItem(itemId: string): Promise<PlanResult<string>> {
+    if (!this.isServer()) return this.localRemoveMaintenanceItem(itemId);
+    const blocked = this.planMutationBlock();
+    if (blocked) return { ok: false, error: blocked };
+    const result = await this.runRemote('/api/garage/maintenance/items/remove', { itemId });
+    return result.ok ? { ok: true, value: itemId } : result;
+  }
+
+  async updateSettings(maintenanceAlertsEnabled: boolean): Promise<boolean> {
+    if (!this.isServer()) return this.localUpdateSettings(maintenanceAlertsEnabled);
+    const result = await this.runRemote('/api/garage/settings', {
+      maintenanceAlertsEnabled,
+      theme: this.settings().theme,
+    });
+    return result.ok;
+  }
+
+  async updateTheme(theme: GarageTheme): Promise<boolean> {
+    if (!this.isServer()) return this.localUpdateTheme(theme);
+    const result = await this.runRemote('/api/garage/settings', {
+      maintenanceAlertsEnabled: this.settings().maintenanceAlertsEnabled,
+      theme,
+    });
+    return result.ok;
+  }
+
+  /** Só no modo local: apaga os dados deste navegador. No servidor não existe apagamento. */
+  async resetToInitialState(): Promise<boolean> {
+    return this.isServer() ? false : this.localResetToInitialState();
+  }
+
+  /** Só no modo local: restaura um backup neste navegador. No servidor use `importToServer`. */
+  async importState(state: GarageState): Promise<boolean> {
+    return this.isServer() ? false : this.localImportState(state);
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // Modo servidor: conexão, leitura e importação.
+  // ---------------------------------------------------------------------------------------
+
+  /** Liga o modo servidor somente depois de ler um snapshot válido e autenticado. */
+  async connectServer(): Promise<StoreResult> {
+    const result = await this.api.snapshot();
+    if (!result.ok) return { ok: false, error: result.failure.message };
+    try {
+      this.storage.setRaw(MODE_KEY, 'server');
+    } catch {
+      return { ok: false, error: 'Não foi possível guardar a preferência neste navegador.' };
+    }
+    this.modeSignal.set('server');
+    this.recoverySignal.set(undefined);
+    if (!this.applySnapshot(result.value)) {
+      return { ok: false, error: 'O servidor respondeu com dados que este aplicativo não aceita.' };
+    }
+    return { ok: true, value: undefined };
+  }
+
+  /** Volta a usar somente os dados deste navegador, que nunca foram apagados. */
+  useLocalMode(): boolean {
+    try {
+      this.storage.remove(MODE_KEY);
+    } catch {
+      return false;
+    }
+    const load = this.loadInitialState();
+    this.modeSignal.set('local');
+    this.remoteSignal.set({ status: 'idle' });
+    this.remoteLoadedSignal.set(false);
+    this.stateSignal.set(load.state);
+    this.recoverySignal.set(load.recovery);
+    return true;
+  }
+
+  /** Relê o snapshot do servidor e publica somente se for válido. */
+  async refreshRemote(): Promise<ApiResult<GarageSnapshot>> {
+    const result = await this.api.snapshot();
+    if (!result.ok) {
+      this.remoteSignal.set({
+        status: 'error',
+        kind: result.failure.kind,
+        message: result.failure.message,
+      });
+      return result;
+    }
+    if (!this.applySnapshot(result.value)) {
+      const message = 'O servidor respondeu com dados que este aplicativo não aceita.';
+      this.remoteSignal.set({ status: 'error', kind: 'invalid', message });
+      return { ok: false, failure: { kind: 'unavailable', message } };
+    }
+    return result;
+  }
+
+  /**
+   * Backup dos dados guardados neste navegador, lido como cópia em memória: o valor original
+   * não é migrado nem regravado.
+   */
+  localDataBackup(exportedAt = new Date().toISOString()): StoreResult<string> {
+    let raw: string | null;
+    try {
+      raw = this.storage.getRaw(STORAGE_KEY);
+    } catch {
+      return { ok: false, error: 'O navegador bloqueou o acesso aos dados locais.' };
+    }
+    const decoded = decodeStoredGarageState(raw, INITIAL_GARAGE_STATE, NX200_PROCEDURES);
+    if (decoded.kind === 'empty') {
+      return { ok: false, error: 'Não há dados do Garage guardados neste navegador.' };
+    }
+    if (decoded.kind === 'invalid-state' || decoded.kind === 'future-version') {
+      return { ok: false, error: decoded.message };
+    }
+    return { ok: true, value: createGarageBackup(decoded.state, exportedAt) };
+  }
+
+  async previewServerImport(content: string): Promise<StoreResult<ImportPreview>> {
+    if (!this.isServer()) return { ok: false, error: 'Conecte ao servidor antes de importar.' };
+    const backup = this.parseJson(content);
+    if (backup === undefined) return { ok: false, error: 'O arquivo não contém um JSON válido.' };
+    const result = await this.api.previewImport(backup);
+    return result.ok
+      ? { ok: true, value: result.value }
+      : { ok: false, error: result.failure.message };
+  }
+
+  async importToServer(content: string, digest: string): Promise<StoreResult> {
+    if (!this.isServer()) return { ok: false, error: 'Conecte ao servidor antes de importar.' };
+    const backup = this.parseJson(content);
+    if (backup === undefined) return { ok: false, error: 'O arquivo não contém um JSON válido.' };
+    this.pendingSignal.update((value) => value + 1);
+    try {
+      const result = await this.api.importBackup(backup, digest, this.revision);
+      if (!result.ok) {
+        await this.refreshRemote();
+        return { ok: false, error: result.failure.message };
+      }
+      const refreshed = await this.refreshRemote();
+      return refreshed.ok
+        ? { ok: true, value: undefined }
+        : {
+            ok: false,
+            error: 'Importado no servidor, mas a releitura falhou. Recarregue a página.',
+          };
+    } finally {
+      this.pendingSignal.update((value) => value - 1);
+    }
+  }
+
+  private localStartProcedure(
     procedureSlug: string,
     acknowledgedWarningIds: readonly string[],
   ): ProcedureExecutionResult {
@@ -145,25 +581,34 @@ export class GarageStore {
       : { ok: false, error: 'Não foi possível salvar o início do procedimento.' };
   }
 
-  completeProcedureStep(executionId: string, stepId: string): ProcedureExecutionResult {
+  private localCompleteProcedureStep(
+    executionId: string,
+    stepId: string,
+  ): ProcedureExecutionResult {
     return this.changeProcedureExecution(executionId, (procedure, execution, now) =>
       completeProcedureStep(procedure, execution, stepId, now),
     );
   }
 
-  uncompleteProcedureStep(executionId: string, stepId: string): ProcedureExecutionResult {
+  private localUncompleteProcedureStep(
+    executionId: string,
+    stepId: string,
+  ): ProcedureExecutionResult {
     return this.changeProcedureExecution(executionId, (procedure, execution, now) =>
       uncompleteProcedureStep(procedure, execution, stepId, now),
     );
   }
 
-  skipOptionalProcedureStep(executionId: string, stepId: string): ProcedureExecutionResult {
+  private localSkipOptionalProcedureStep(
+    executionId: string,
+    stepId: string,
+  ): ProcedureExecutionResult {
     return this.changeProcedureExecution(executionId, (procedure, execution, now) =>
       skipOptionalProcedureStep(procedure, execution, stepId, now),
     );
   }
 
-  setProcedureFinalCheck(
+  private localSetProcedureFinalCheck(
     executionId: string,
     checkId: string,
     completed: boolean,
@@ -173,7 +618,7 @@ export class GarageStore {
     );
   }
 
-  finishProcedure(executionId: string, note?: string): ProcedureExecutionResult {
+  private localFinishProcedure(executionId: string, note?: string): ProcedureExecutionResult {
     const execution = this.stateSignal().procedureExecutions.find(
       (candidate) => candidate.id === executionId,
     );
@@ -200,13 +645,13 @@ export class GarageStore {
     );
   }
 
-  cancelProcedure(executionId: string): ProcedureExecutionResult {
+  private localCancelProcedure(executionId: string): ProcedureExecutionResult {
     return this.changeProcedureExecution(executionId, (_procedure, execution, now) =>
       cancelProcedureExecution(execution, now),
     );
   }
 
-  restartProcedure(executionId: string): ProcedureExecutionResult {
+  private localRestartProcedure(executionId: string): ProcedureExecutionResult {
     const blocked = this.procedureMutationBlock();
     if (blocked) return { ok: false, error: blocked };
     const execution = this.stateSignal().procedureExecutions.find(
@@ -236,7 +681,7 @@ export class GarageStore {
       : { ok: false, error: 'Não foi possível reiniciar o procedimento.' };
   }
 
-  updateMileage(request: OdometerUpdateRequest): OdometerUpdateResult {
+  private localUpdateMileage(request: OdometerUpdateRequest): OdometerUpdateResult {
     const currentMileage = this.motorcycle().currentMileage;
     if (!this.setup().completed) {
       return {
@@ -282,7 +727,7 @@ export class GarageStore {
         };
   }
 
-  saveMotorcycle(
+  private localSaveMotorcycle(
     changes: Pick<Motorcycle, 'nickname' | 'year'>,
     request: OdometerUpdateRequest,
   ): OdometerUpdateResult {
@@ -330,7 +775,7 @@ export class GarageStore {
         };
   }
 
-  completeSetup(
+  private localCompleteSetup(
     changes: Pick<Motorcycle, 'nickname' | 'year' | 'currentMileage'>,
     note?: string,
   ): boolean {
@@ -363,6 +808,7 @@ export class GarageStore {
       motorcycle: {
         ...this.motorcycle(),
         ...changes,
+        createdAt: this.setup().completed ? this.motorcycle().createdAt : recordedAt,
         updatedAt: recordedAt,
       },
       maintenancePlan: this.stateSignal().maintenancePlan.map((item) =>
@@ -383,7 +829,7 @@ export class GarageStore {
     });
   }
 
-  addService(input: NewServiceRecord): ServiceRecord | null {
+  private localAddService(input: NewServiceRecord): ServiceRecord | null {
     if (this.recoverySignal() || !this.setup().completed) {
       return null;
     }
@@ -446,7 +892,7 @@ export class GarageStore {
     return this.persist(nextState) ? record : null;
   }
 
-  addFuel(input: NewFuelRecord): FuelRecord | null {
+  private localAddFuel(input: NewFuelRecord): FuelRecord | null {
     if (this.recoverySignal() || !this.setup().completed) return null;
     const validation = validateNewFuelRecord(input, this.motorcycle().currentMileage);
     if (!validation.valid) return null;
@@ -488,7 +934,7 @@ export class GarageStore {
     return this.persist(nextState) ? record : null;
   }
 
-  addExpense(input: NewExpenseRecord): ExpenseRecord | null {
+  private localAddExpense(input: NewExpenseRecord): ExpenseRecord | null {
     if (
       this.recoverySignal() ||
       !this.setup().completed ||
@@ -514,7 +960,7 @@ export class GarageStore {
       : null;
   }
 
-  addOccurrence(input: NewOccurrenceRecord): OccurrenceRecord | null {
+  private localAddOccurrence(input: NewOccurrenceRecord): OccurrenceRecord | null {
     if (
       this.recoverySignal() ||
       !this.setup().completed ||
@@ -541,7 +987,7 @@ export class GarageStore {
       : null;
   }
 
-  addSafetyCheck(input: NewSafetyCheckRecord): SafetyCheckResult {
+  private localAddSafetyCheck(input: NewSafetyCheckRecord): SafetyCheckResult {
     if (this.recoverySignal() || !this.setup().completed) {
       return { ok: false, error: 'Configure sua NX200 e resolva os dados locais antes de salvar.' };
     }
@@ -561,22 +1007,76 @@ export class GarageStore {
       : { ok: false, error: 'Não foi possível salvar a inspeção neste dispositivo.' };
   }
 
-  updateSettings(maintenanceAlertsEnabled: boolean): boolean {
+  /** Cria um item de manutenção definido pelo usuário, sem fonte técnica. */
+  private localAddMaintenanceItem(input: NewUserMaintenanceItem): PlanResult<MaintenancePlanItem> {
+    const blocked = this.planMutationBlock();
+    if (blocked) return { ok: false, error: blocked };
+    const result = createUserMaintenanceItem(
+      input,
+      `${USER_PLAN_ITEM_ID_PREFIX}${this.createId('plan')}`,
+      new Date().toISOString(),
+    );
+    if (!result.ok) return result;
+    return this.persist({
+      ...this.stateSignal(),
+      maintenancePlan: [...this.stateSignal().maintenancePlan, result.value],
+    })
+      ? result
+      : { ok: false, error: 'Não foi possível salvar o item neste dispositivo.' };
+  }
+
+  /** Edita nome, categoria e intervalo de um item criado pelo usuário. */
+  private localUpdateMaintenanceItem(
+    itemId: string,
+    input: NewUserMaintenanceItem,
+  ): PlanResult<MaintenancePlanItem> {
+    return this.changeMaintenanceItem(itemId, (item, now) =>
+      updateUserMaintenanceItem(item, input, now),
+    );
+  }
+
+  /** Define (ou remove, com `null`) o intervalo próprio de qualquer item do plano. */
+  private localSetMaintenanceSchedule(
+    itemId: string,
+    input: MaintenanceScheduleInput | null,
+  ): PlanResult<MaintenancePlanItem> {
+    return this.changeMaintenanceItem(itemId, (item, now) => applyUserSchedule(item, input, now));
+  }
+
+  private localRemoveMaintenanceItem(itemId: string): PlanResult<string> {
+    const blocked = this.planMutationBlock();
+    if (blocked) return { ok: false, error: blocked };
+    const item = this.stateSignal().maintenancePlan.find((candidate) => candidate.id === itemId);
+    if (!item) return { ok: false, error: 'Item do plano não encontrado.' };
+    const error = planItemRemovalError(item, this.stateSignal().serviceHistory);
+    if (error) return { ok: false, error };
+    return this.persist({
+      ...this.stateSignal(),
+      maintenancePlan: this.stateSignal().maintenancePlan.filter(
+        (candidate) => candidate.id !== itemId,
+      ),
+    })
+      ? { ok: true, value: itemId }
+      : { ok: false, error: 'Não foi possível remover o item neste dispositivo.' };
+  }
+
+  private localUpdateSettings(maintenanceAlertsEnabled: boolean): boolean {
     return this.persist({
       ...this.stateSignal(),
       settings: { ...this.settings(), maintenanceAlertsEnabled },
     });
   }
 
-  updateTheme(theme: GarageTheme): boolean {
+  private localUpdateTheme(theme: GarageTheme): boolean {
     return this.persist({
       ...this.stateSignal(),
       settings: { ...this.settings(), theme },
     });
   }
 
-  resetDemoData(): boolean {
-    return this.replaceState(INITIAL_GARAGE_STATE);
+  /** Apaga os dados locais e volta ao primeiro uso, preservando apenas as preferências. */
+  private localResetToInitialState(): boolean {
+    return this.replaceState({ ...INITIAL_GARAGE_STATE, settings: this.settings() });
   }
 
   exportData(exportedAt = new Date().toISOString()): string {
@@ -587,7 +1087,7 @@ export class GarageStore {
     return this.recoverySignal()?.rawValue ?? null;
   }
 
-  importState(state: GarageState): boolean {
+  private localImportState(state: GarageState): boolean {
     return this.replaceState(state);
   }
 
@@ -725,6 +1225,164 @@ export class GarageStore {
     return persisted
       ? result
       : { ok: false, error: 'Não foi possível salvar a execução do procedimento.' };
+  }
+
+  private readMode(): GarageMode {
+    try {
+      return this.storage.getRaw(MODE_KEY) === 'server' ? 'server' : 'local';
+    } catch {
+      return 'local';
+    }
+  }
+
+  private isServer(): boolean {
+    return this.modeSignal() === 'server';
+  }
+
+  private applySnapshot(snapshot: GarageSnapshot): boolean {
+    let state: GarageState;
+    if (snapshot.status === 'not-configured') {
+      state = {
+        ...INITIAL_GARAGE_STATE,
+        settings: snapshot.settings ?? INITIAL_GARAGE_STATE.settings,
+      };
+    } else {
+      if (!snapshot.state || !validateGarageState(snapshot.state, NX200_PROCEDURES).valid) {
+        return false;
+      }
+      state = snapshot.state;
+    }
+    this.revision = snapshot.revision;
+    this.stateSignal.set(state);
+    this.remoteSignal.set({ status: 'ready', snapshot: snapshot.status });
+    this.remoteLoadedSignal.set(true);
+    return true;
+  }
+
+  /** Envia um comando com a revisão conhecida e publica o snapshot confirmado depois. */
+  private async runRemote(path: string, payload: unknown): Promise<RemoteCommand> {
+    if (this.remoteSignal().status !== 'ready') {
+      return { ok: false, error: 'O servidor não está disponível. Recarregue e tente de novo.' };
+    }
+    this.pendingSignal.update((value) => value + 1);
+    try {
+      const result = await this.api.command(path, payload, this.revision);
+      if (!result.ok) {
+        if (result.failure.kind === 'conflict') await this.refreshRemote();
+        if (result.failure.kind === 'unauthenticated' || result.failure.kind === 'network') {
+          this.remoteSignal.set({
+            status: 'error',
+            kind: result.failure.kind,
+            message: result.failure.message,
+          });
+        }
+        return { ok: false, error: result.failure.message };
+      }
+      // A escrita foi confirmada. Se a releitura falhar, o banner de erro remoto avisa.
+      await this.refreshRemote();
+      return { ok: true, ids: result.value.result.ids };
+    } finally {
+      this.pendingSignal.update((value) => value - 1);
+    }
+  }
+
+  private remoteProcedureUpdate(
+    executionId: string,
+    action: 'complete-step' | 'uncomplete-step' | 'skip-optional-step' | 'set-final-check',
+    targetId: string,
+    completed?: boolean,
+  ): Promise<ProcedureExecutionResult> {
+    const blocked = this.procedureMutationBlock();
+    if (blocked) return Promise.resolve({ ok: false, error: blocked });
+    return this.runRemote('/api/garage/procedures/update', {
+      executionId,
+      action,
+      targetId,
+      completed,
+    }).then((result) => this.executionResult(result, executionId));
+  }
+
+  private executionResult(result: RemoteCommand, executionId?: string): ProcedureExecutionResult {
+    if (!result.ok) return result;
+    const execution = this.stateSignal().procedureExecutions.find(
+      (candidate) => candidate.id === executionId,
+    );
+    return execution
+      ? { ok: true, execution }
+      : { ok: false, error: 'A execução foi salva, mas não apareceu nos dados recarregados.' };
+  }
+
+  private planItemResult(result: RemoteCommand, itemId?: string): PlanResult<MaintenancePlanItem> {
+    if (!result.ok) return result;
+    const item = this.stateSignal().maintenancePlan.find((candidate) => candidate.id === itemId);
+    return item
+      ? { ok: true, value: item }
+      : { ok: false, error: 'O item foi salvo, mas não apareceu nos dados recarregados.' };
+  }
+
+  private created<T extends { readonly id: string }>(
+    result: RemoteCommand,
+    collection: readonly T[],
+  ): T | null {
+    if (!result.ok) return null;
+    return collection.find((candidate) => candidate.id === result.ids[0]) ?? null;
+  }
+
+  private remoteOdometerPrecheck(request: OdometerUpdateRequest): OdometerUpdateResult {
+    const currentMileage = this.motorcycle().currentMileage;
+    if (!this.setup().completed) {
+      return {
+        status: 'blocked',
+        previousMileage: currentMileage,
+        requestedMileage: request.mileage,
+        impact: 'Conclua a configuração da sua NX200 antes de atualizar o odômetro.',
+      };
+    }
+    return evaluateOdometerUpdate(currentMileage, request);
+  }
+
+  private scheduleFields(input: MaintenanceScheduleInput): MaintenanceScheduleInput {
+    return {
+      intervalKm: input.intervalKm,
+      intervalDays: input.intervalDays,
+      warningKm: input.warningKm,
+      warningDays: input.warningDays,
+      note: input.note,
+    };
+  }
+
+  private parseJson(content: string): unknown {
+    try {
+      return JSON.parse(content) as unknown;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private changeMaintenanceItem(
+    itemId: string,
+    mutation: (item: MaintenancePlanItem, now: string) => PlanResult<MaintenancePlanItem>,
+  ): PlanResult<MaintenancePlanItem> {
+    const blocked = this.planMutationBlock();
+    if (blocked) return { ok: false, error: blocked };
+    const item = this.stateSignal().maintenancePlan.find((candidate) => candidate.id === itemId);
+    if (!item) return { ok: false, error: 'Item do plano não encontrado.' };
+    const result = mutation(item, new Date().toISOString());
+    if (!result.ok) return result;
+    return this.persist({
+      ...this.stateSignal(),
+      maintenancePlan: this.stateSignal().maintenancePlan.map((candidate) =>
+        candidate.id === itemId ? result.value : candidate,
+      ),
+    })
+      ? result
+      : { ok: false, error: 'Não foi possível salvar o plano neste dispositivo.' };
+  }
+
+  private planMutationBlock(): string | null {
+    if (!this.setup().completed) return 'Conclua a configuração inicial antes de editar o plano.';
+    if (this.recoverySignal()) return 'Resolva a recuperação dos dados locais antes de continuar.';
+    return null;
   }
 
   private procedureMutationBlock(): string | null {

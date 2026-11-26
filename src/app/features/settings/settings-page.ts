@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import type { ImportPreview } from '../../../../shared/garage';
 import { parseGarageBackup } from '../../core/domain/backup';
 import { GarageBackup, GarageBackupSummary } from '../../core/models/backup.model';
 import { GarageTheme } from '../../core/models/garage-state.model';
@@ -23,7 +24,7 @@ import { GarageStore } from '../../core/services/garage-store.service';
             <p>{{ recovery.message }}</p>
             <p>
               O valor original não foi substituído. Exporte-o antes de importar um backup ou
-              restaurar a demonstração.
+              recomeçar do zero.
             </p>
           </div>
           <button class="button button-secondary" type="button" (click)="exportRecoveryData()">
@@ -31,6 +32,192 @@ import { GarageStore } from '../../core/services/garage-store.service';
           </button>
         </section>
       }
+
+      <section class="card settings-section" aria-labelledby="server-title">
+        <div class="settings-heading">
+          <span class="settings-icon" aria-hidden="true">⇅</span>
+          <div>
+            <h2 id="server-title">Onde ficam seus dados</h2>
+            @if (store.mode() === 'server') {
+              <p>
+                Modo servidor: os dados ficam no servidor do Garage e aparecem em qualquer
+                dispositivo com acesso liberado.
+              </p>
+            } @else {
+              <p>
+                Modo local: os dados ficam só neste navegador. Exporte backups para não perdê-los.
+              </p>
+            }
+          </div>
+        </div>
+
+        @if (store.mode() === 'server') {
+          @switch (store.remote().status) {
+            @case ('loading') {
+              <p class="settings-footnote" role="status">Carregando dados do servidor…</p>
+            }
+            @case ('ready') {
+              <p class="success-message" role="status">Conectado ao servidor.</p>
+            }
+            @case ('error') {
+              <p class="field-error import-message" role="alert">{{ remoteErrorMessage() }}</p>
+              <div class="settings-actions">
+                <button class="button button-secondary" type="button" (click)="retryServer()">
+                  Tentar de novo
+                </button>
+              </div>
+            }
+          }
+
+          @if (store.remote().status === 'ready' && serverIsEmpty()) {
+            <div class="import-preview" aria-labelledby="server-import-title">
+              <p class="eyebrow">Servidor vazio</p>
+              <h3 id="server-import-title">Importar dados para o servidor</h3>
+              <p>
+                Envie os dados deste navegador ou um backup JSON. Você revisa o resumo antes de
+                confirmar; nada é gravado até lá.
+              </p>
+              <div class="settings-actions">
+                <button
+                  class="button button-secondary"
+                  type="button"
+                  [disabled]="store.busy()"
+                  (click)="previewLocalData()"
+                >
+                  Usar dados deste navegador
+                </button>
+                <label class="button button-secondary file-button">
+                  Selecionar backup
+                  <input
+                    type="file"
+                    accept=".json,application/json"
+                    (change)="previewServerFile($event)"
+                  />
+                </label>
+              </div>
+            </div>
+          }
+
+          @if (serverPreview(); as pending) {
+            <div class="import-preview" aria-labelledby="server-preview-title">
+              <div class="inline-between">
+                <div>
+                  <p class="eyebrow">Validado pelo servidor</p>
+                  <h3 id="server-preview-title">Revisar importação</h3>
+                </div>
+                <button class="text-button" type="button" (click)="cancelServerImport()">
+                  Cancelar
+                </button>
+              </div>
+              <p>
+                <strong>{{ pending.label }}</strong>
+              </p>
+              <dl class="backup-summary">
+                <div>
+                  <dt>Motocicleta</dt>
+                  <dd>
+                    {{ pending.preview.summary.motorcycle }} · {{ pending.preview.summary.year }}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Quilometragem</dt>
+                  <dd>{{ pending.preview.summary.currentMileage.toLocaleString('pt-BR') }} km</dd>
+                </div>
+                <div>
+                  <dt>Serviços</dt>
+                  <dd>{{ pending.preview.summary.serviceRecords }}</dd>
+                </div>
+                <div>
+                  <dt>Abastecimentos</dt>
+                  <dd>{{ pending.preview.summary.fuelRecords }}</dd>
+                </div>
+                <div>
+                  <dt>Leituras do odômetro</dt>
+                  <dd>{{ pending.preview.summary.odometerRecords }}</dd>
+                </div>
+                <div>
+                  <dt>Itens do plano</dt>
+                  <dd>{{ pending.preview.summary.maintenanceItems }}</dd>
+                </div>
+              </dl>
+              @if (pending.preview.excludedDemoServices > 0) {
+                <p class="settings-footnote">
+                  {{ pending.preview.excludedDemoServices }} serviço(s) de demonstração ficam de
+                  fora.
+                </p>
+              }
+              <p class="settings-footnote">
+                {{
+                  pending.preview.settings === 'keep-remote'
+                    ? 'O tema e os alertas atuais do servidor serão mantidos.'
+                    : 'O tema e os alertas do backup serão usados.'
+                }}
+              </p>
+              @if (pending.preview.target === 'occupied') {
+                <p class="field-error import-message" role="alert">
+                  O servidor já tem dados. A importação só é feita em um servidor vazio.
+                </p>
+              } @else {
+                <div class="confirm-box" role="alert">
+                  <strong>Importar para o servidor?</strong>
+                  <p>
+                    Os dados acima são gravados no servidor de uma vez. Os dados deste navegador
+                    continuam guardados aqui.
+                  </p>
+                  <div>
+                    <button
+                      class="button button-secondary"
+                      type="button"
+                      (click)="cancelServerImport()"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      class="button button-primary"
+                      type="button"
+                      [disabled]="store.busy()"
+                      (click)="confirmServerImport()"
+                    >
+                      Confirmar importação
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          <div class="settings-actions">
+            <button class="text-button" type="button" (click)="useLocal()">
+              Usar somente este navegador
+            </button>
+          </div>
+        } @else {
+          <div class="settings-actions">
+            <button
+              class="button button-secondary"
+              type="button"
+              [disabled]="connecting()"
+              (click)="connectServer()"
+            >
+              {{ connecting() ? 'Conectando…' : 'Conectar ao servidor do Garage' }}
+            </button>
+          </div>
+          <p class="settings-footnote">
+            Requer acesso liberado ao servidor. Os dados deste navegador não são apagados; depois de
+            conectar você pode importá-los.
+          </p>
+        }
+        @if (serverMessage()) {
+          <p
+            [class]="
+              serverMessageKind() === 'error' ? 'field-error import-message' : 'success-message'
+            "
+            [attr.role]="serverMessageKind() === 'error' ? 'alert' : 'status'"
+          >
+            {{ serverMessage() }}
+          </p>
+        }
+      </section>
 
       <section class="card settings-section">
         <div class="settings-heading">
@@ -57,9 +244,16 @@ import { GarageStore } from '../../core/services/garage-store.service';
           </select>
         </div>
         <p class="settings-footnote">
-          A preferência fica salva neste dispositivo. O Garage também respeita a redução de
-          movimento configurada no sistema.
+          {{
+            store.mode() === 'server'
+              ? 'A preferência fica salva no servidor.'
+              : 'A preferência fica salva neste dispositivo.'
+          }}
+          O Garage também respeita a redução de movimento configurada no sistema.
         </p>
+        @if (settingsError()) {
+          <p class="field-error import-message" role="alert">{{ settingsError() }}</p>
+        }
       </section>
 
       <section class="card settings-section">
@@ -90,8 +284,14 @@ import { GarageStore } from '../../core/services/garage-store.service';
         <div class="settings-heading">
           <span class="settings-icon" aria-hidden="true">▣</span>
           <div>
-            <h2 id="backup-title">Backup neste dispositivo</h2>
-            <p>Exporte todos os seus registros ou confira um arquivo antes de importá-lo.</p>
+            <h2 id="backup-title">Backup</h2>
+            <p>
+              {{
+                store.mode() === 'server'
+                  ? 'Exporte uma cópia dos seus registros do servidor.'
+                  : 'Exporte todos os seus registros ou confira um arquivo antes de importá-lo.'
+              }}
+            </p>
           </div>
         </div>
 
@@ -99,10 +299,12 @@ import { GarageStore } from '../../core/services/garage-store.service';
           <button class="button button-secondary" type="button" (click)="exportData()">
             Exportar backup JSON
           </button>
-          <label class="button button-secondary file-button">
-            Selecionar backup
-            <input type="file" accept=".json,application/json" (change)="selectBackup($event)" />
-          </label>
+          @if (store.mode() === 'local') {
+            <label class="button button-secondary file-button">
+              Selecionar backup
+              <input type="file" accept=".json,application/json" (change)="selectBackup($event)" />
+            </label>
+          }
         </div>
 
         @if (exported()) {
@@ -188,35 +390,47 @@ import { GarageStore } from '../../core/services/garage-store.service';
         }
       </section>
 
-      <section class="card settings-section">
-        <div class="settings-heading">
-          <span class="settings-icon" aria-hidden="true">↺</span>
-          <div>
-            <h2>Restaurar demonstração</h2>
-            <p>Reinicie o Garage com dados demonstrativos e refaça a configuração inicial.</p>
-          </div>
-        </div>
-        <div class="settings-actions">
-          <button class="text-button danger" type="button" (click)="showReset.set(true)">
-            Restaurar demonstração
-          </button>
-        </div>
-
-        @if (showReset()) {
-          <div class="confirm-box" role="alert">
-            <strong>Substituir seus dados?</strong>
-            <p>O plano e os históricos atuais serão trocados pelos dados demonstrativos.</p>
+      @if (store.mode() === 'local') {
+        <section class="card settings-section">
+          <div class="settings-heading">
+            <span class="settings-icon" aria-hidden="true">↺</span>
             <div>
-              <button class="button button-secondary" type="button" (click)="showReset.set(false)">
-                Cancelar
-              </button>
-              <button class="button button-danger" type="button" (click)="reset()">
-                Restaurar
-              </button>
+              <h2>Recomeçar do zero</h2>
+              <p>
+                Apague os dados deste dispositivo e refaça a configuração inicial. O tema e os
+                alertas são mantidos.
+              </p>
             </div>
           </div>
-        }
-      </section>
+          <div class="settings-actions">
+            <button class="text-button danger" type="button" (click)="showReset.set(true)">
+              Apagar dados e recomeçar
+            </button>
+          </div>
+
+          @if (showReset()) {
+            <div class="confirm-box" role="alert">
+              <strong>Apagar seus dados?</strong>
+              <p>
+                Serviços, abastecimentos, gastos, ocorrências, inspeções e o histórico do odômetro
+                serão apagados deste dispositivo. Exporte um backup antes se quiser guardá-los.
+              </p>
+              <div>
+                <button
+                  class="button button-secondary"
+                  type="button"
+                  (click)="showReset.set(false)"
+                >
+                  Cancelar
+                </button>
+                <button class="button button-danger" type="button" (click)="reset()">
+                  Apagar e recomeçar
+                </button>
+              </div>
+            </div>
+          }
+        </section>
+      }
 
       <section class="card about-card">
         <span class="brand-mark large" aria-hidden="true">G</span>
@@ -239,19 +453,125 @@ export class SettingsPage {
   protected readonly backupSummary = signal<GarageBackupSummary | null>(null);
   protected readonly selectedFilename = signal('');
   private readonly pendingBackup = signal<GarageBackup | null>(null);
+  protected readonly settingsError = signal('');
+  protected readonly connecting = signal(false);
+  protected readonly serverMessage = signal('');
+  protected readonly serverMessageKind = signal<'error' | 'success'>('success');
+  protected readonly serverPreview = signal<{
+    readonly label: string;
+    readonly content: string;
+    readonly preview: ImportPreview;
+  } | null>(null);
+  protected readonly serverIsEmpty = computed(() => {
+    const remote = this.store.remote();
+    return remote.status === 'ready' && remote.snapshot === 'not-configured';
+  });
+  protected readonly remoteErrorMessage = computed(() => {
+    const remote = this.store.remote();
+    return remote.status === 'error' ? remote.message : '';
+  });
 
-  protected toggleAlerts(event: Event): void {
+  protected async toggleAlerts(event: Event): Promise<void> {
     const target = event.target;
-    if (target instanceof HTMLInputElement) {
-      this.store.updateSettings(target.checked);
+    if (!(target instanceof HTMLInputElement)) return;
+    this.settingsError.set('');
+    if (!(await this.store.updateSettings(target.checked))) {
+      target.checked = this.store.settings().maintenanceAlertsEnabled;
+      this.settingsError.set('Não foi possível salvar a preferência de alertas.');
     }
   }
 
-  protected changeTheme(event: Event): void {
+  protected async changeTheme(event: Event): Promise<void> {
     const target = event.target;
-    if (target instanceof HTMLSelectElement) {
-      this.store.updateTheme(target.value as GarageTheme);
+    if (!(target instanceof HTMLSelectElement)) return;
+    this.settingsError.set('');
+    if (!(await this.store.updateTheme(target.value as GarageTheme))) {
+      target.value = this.store.settings().theme;
+      this.settingsError.set('Não foi possível salvar o tema.');
     }
+  }
+
+  protected async connectServer(): Promise<void> {
+    this.connecting.set(true);
+    this.serverMessage.set('');
+    const result = await this.store.connectServer();
+    this.connecting.set(false);
+    this.showServerMessage(result.ok ? 'Conectado ao servidor.' : result.error, !result.ok);
+  }
+
+  protected async retryServer(): Promise<void> {
+    this.serverMessage.set('');
+    await this.store.refreshRemote();
+  }
+
+  protected useLocal(): void {
+    this.cancelServerImport();
+    if (!this.store.useLocalMode()) {
+      this.showServerMessage('Não foi possível voltar ao modo local.', true);
+      return;
+    }
+    this.showServerMessage('Usando somente os dados deste navegador.', false);
+  }
+
+  protected async previewLocalData(): Promise<void> {
+    const backup = this.store.localDataBackup();
+    if (!backup.ok) {
+      this.showServerMessage(backup.error, true);
+      return;
+    }
+    await this.previewServerContent(backup.value, 'Dados deste navegador');
+  }
+
+  protected async previewServerFile(event: Event): Promise<void> {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    const file = target.files?.[0];
+    target.value = '';
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.json') || file.size > 2_000_000) {
+      this.showServerMessage('Selecione um backup .json com até 2 MB.', true);
+      return;
+    }
+    let content: string;
+    try {
+      content = await file.text();
+    } catch {
+      this.showServerMessage('Não foi possível ler o arquivo selecionado.', true);
+      return;
+    }
+    await this.previewServerContent(content, file.name);
+  }
+
+  protected cancelServerImport(): void {
+    this.serverPreview.set(null);
+  }
+
+  protected async confirmServerImport(): Promise<void> {
+    const pending = this.serverPreview();
+    if (!pending) return;
+    const result = await this.store.importToServer(pending.content, pending.preview.digest);
+    if (!result.ok) {
+      this.showServerMessage(result.error, true);
+      return;
+    }
+    this.serverPreview.set(null);
+    this.showServerMessage('Dados importados para o servidor.', false);
+  }
+
+  private async previewServerContent(content: string, label: string): Promise<void> {
+    this.serverMessage.set('');
+    this.serverPreview.set(null);
+    const result = await this.store.previewServerImport(content);
+    if (!result.ok) {
+      this.showServerMessage(result.error, true);
+      return;
+    }
+    this.serverPreview.set({ label, content, preview: result.value });
+  }
+
+  private showServerMessage(message: string, error: boolean): void {
+    this.serverMessageKind.set(error ? 'error' : 'success');
+    this.serverMessage.set(message);
   }
 
   protected themeLabel(theme: GarageTheme): string {
@@ -322,12 +642,12 @@ export class SettingsPage {
     this.importError.set('');
   }
 
-  protected confirmImport(): void {
+  protected async confirmImport(): Promise<void> {
     const backup = this.pendingBackup();
     if (!backup) {
       return;
     }
-    if (!this.store.importState(backup.state)) {
+    if (!(await this.store.importState(backup.state))) {
       this.importError.set('Não foi possível gravar o backup neste dispositivo.');
       return;
     }
@@ -335,9 +655,9 @@ export class SettingsPage {
     this.imported.set(true);
   }
 
-  protected reset(): void {
-    if (!this.store.resetDemoData()) {
-      this.importError.set('Não foi possível restaurar os dados neste dispositivo.');
+  protected async reset(): Promise<void> {
+    if (!(await this.store.resetToInitialState())) {
+      this.importError.set('Não foi possível apagar os dados neste dispositivo.');
       return;
     }
     this.showReset.set(false);

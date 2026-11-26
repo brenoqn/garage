@@ -5,15 +5,17 @@ do proxy reverso e do provedor de borda são mantidas fora deste repositório.
 
 ## Aplicação
 
-O Garage é uma PWA Angular frontend-only. Não possui backend, banco de dados, autenticação ou
-sincronização remota. A produção pública está em:
+O Garage em produção ainda é servido como PWA Angular usando somente o armazenamento local. O
+repositório já contém a Garage API (`server/`, imagem `ghcr.io/brenoqn/garage-api`), que só deve
+ser ligada seguindo `docs/BQTECH-API-ACTIVATION.md`, atrás do Cloudflare Access. A produção está
+em:
 
 ```text
 https://garage.bqtech.com.br
 ```
 
 O estado do usuário é persistido no `LocalStorage`, na chave física `garage_state`, atualmente
-com `schemaVersion: 4`. Como o armazenamento é isolado por origem, dados criados em outro domínio
+com `schemaVersion: 5`. Como o armazenamento é isolado por origem, dados criados em outro domínio
 devem ser exportados como backup JSON e importados na origem de produção.
 
 ## Container e cache
@@ -36,6 +38,9 @@ A configuração de produção preserva o funcionamento da PWA:
 Pull requests para `main` executam validação. Pushes para `main`, depois de aprovados os checks,
 publicam no GHCR as tags `latest` e `sha-<commit-curto>`. O GitHub Actions não acessa o ambiente
 privado nem recebe credenciais do servidor.
+
+Os pushes também publicam `ghcr.io/brenoqn/garage-api` (`Dockerfile.api`), com as mesmas tags.
+Migrations nunca rodam no CI nem no startup da API.
 
 O deploy é iniciado pelo próprio servidor por polling controlado. O processo de produção
 reportado baixa a imagem, faz health check e preserva rollback. Compose, timer, script de update,

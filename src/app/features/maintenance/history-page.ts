@@ -25,10 +25,8 @@ import { GarageStore } from '../../core/services/garage-store.service';
       @if (!store.setup().completed) {
         <section class="setup-banner" role="status">
           <div>
-            <strong>Histórico demonstrativo</strong>
-            <p>
-              Os registros abaixo são exemplos e não foram confirmados como serviços da sua moto.
-            </p>
+            <strong>Configure sua moto para começar</strong>
+            <p>O histórico reúne os serviços que você registrar depois da configuração inicial.</p>
           </div>
           <a class="button button-secondary" routerLink="/motorcycle">Configurar agora</a>
         </section>

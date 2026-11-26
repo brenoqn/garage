@@ -102,7 +102,11 @@ import { GarageStore } from '../../core/services/garage-store.service';
             </p>
           }
           <div class="form-actions">
-            <button class="button button-primary" type="submit" [disabled]="form.invalid">
+            <button
+              class="button button-primary"
+              type="submit"
+              [disabled]="form.invalid || store.busy()"
+            >
               Salvar gasto
             </button>
           </div>
@@ -188,13 +192,13 @@ export class ExpensesPage {
     notes: ['', Validators.maxLength(240)],
   });
 
-  protected save(): void {
+  protected async save(): Promise<void> {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
     }
     const value = this.form.getRawValue();
-    const record = this.store.addExpense({
+    const record = await this.store.addExpense({
       title: value.title,
       amount: value.amount!,
       category: value.category,

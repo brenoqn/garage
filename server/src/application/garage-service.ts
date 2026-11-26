@@ -6,6 +6,7 @@ import type {
   GarageSettings,
   GarageSnapshot,
   GarageState,
+  ImportPreview,
   MaintenancePlanItem,
   Motorcycle,
   OccurrenceRecord,
@@ -30,6 +31,16 @@ import {
   timestamp,
 } from '../../../shared/validation';
 import { evaluateOdometerUpdate } from '../../../shared/odometer-policy';
+import {
+  applyUserSchedule,
+  createUserMaintenanceItem,
+  MAINTENANCE_CATEGORIES,
+  MaintenanceScheduleInput,
+  planItemRemovalError,
+  PlanResult,
+  updateUserMaintenanceItem,
+  USER_PLAN_ITEM_ID_PREFIX,
+} from '../../../shared/maintenance-plan';
 import { shouldReplaceMaintenanceExecution } from '../../../shared/service-chronology';
 import { validateNewFuelRecord } from '../../../shared/fuel-consumption';
 import { buildSafetyCheckRecord } from '../../../shared/safety-check';
@@ -44,6 +55,13 @@ import {
   uncompleteProcedureStep,
 } from '../../../src/app/core/domain/procedure-execution';
 import { validateGarageState } from '../../../src/app/core/domain/garage-state-migration';
+import {
+  canonicalJson,
+  comparableImportState,
+  IMPORT_NORMALIZATION_VERSION,
+  prepareImport,
+} from '../../../src/app/core/domain/import-preparation';
+import type { GarageBackupSummary } from '../../../src/app/core/models/backup.model';
 import {
   criticalProcedureCompletionBlocked,
   detectTechnicalConflicts,
@@ -128,6 +146,38 @@ interface WriteContext {
   readonly now: string;
 }
 
+const SCHEDULE_FIELDS = ['intervalKm', 'intervalDays', 'warningKm', 'warningDays', 'note'] as const;
+
+function optionalInteger(value: unknown, name: string): number | undefined {
+  return value === undefined ? undefined : integer(value, name);
+}
+
+function scheduleInput(input: Record<string, unknown>): MaintenanceScheduleInput {
+  return {
+    intervalKm: optionalInteger(input['intervalKm'], 'intervalKm'),
+    intervalDays: optionalInteger(input['intervalDays'], 'intervalDays'),
+    warningKm: optionalInteger(input['warningKm'], 'warningKm'),
+    warningDays: optionalInteger(input['warningDays'], 'warningDays'),
+    note: optionalString(input['note'], 'note', 240),
+  };
+}
+
+function unwrap<T>(result: PlanResult<T>): T {
+  if (!result.ok) return fail(result.error);
+  return result.value;
+}
+
+async function findPlanItem(
+  repo: Repositories,
+  motorcycleId: string,
+  itemId: unknown,
+): Promise<MaintenancePlanItem> {
+  const id = string(itemId, 'itemId', 200);
+  const item = (await repo.maintenance.list(motorcycleId)).find((candidate) => candidate.id === id);
+  if (!item) return fail('Unknown maintenance plan item', 'NOT_FOUND', 404);
+  return item;
+}
+
 function configured(motorcycle: Motorcycle | null): Motorcycle {
   if (!motorcycle) return fail('Garage has not been configured', 'NOT_CONFIGURED', 409);
   return motorcycle;
@@ -148,12 +198,47 @@ function snapshotState(
   },
 ): GarageState {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     motorcycle,
     ...data,
     settings,
     setup: { completed: true, demoData: false },
   };
+}
+
+async function loadState(
+  repo: Repositories,
+  motorcycle: Motorcycle,
+  settings: GarageSettings,
+): Promise<GarageState> {
+  return snapshotState(motorcycle, settings, {
+    maintenancePlan: await repo.maintenance.list(motorcycle.id),
+    serviceHistory: await repo.service.list(motorcycle.id),
+    odometerHistory: await repo.odometer.list(motorcycle.id),
+    procedureExecutions: await repo.procedure.list(motorcycle.id),
+    fuelHistory: await repo.fuel.list(motorcycle.id),
+    expenseHistory: await repo.expense.list(motorcycle.id),
+    occurrenceHistory: await repo.occurrence.list(motorcycle.id),
+    safetyCheckHistory: await repo.safety.list(motorcycle.id),
+  });
+}
+
+/** Valida o backup e calcula o hash do conteúdo normalizado. Lança 400 se recusado. */
+function prepareImportPayload(backup: unknown): {
+  readonly state: GarageState;
+  readonly digest: string;
+  readonly summary: GarageBackupSummary;
+  readonly excludedDemoServices: number;
+} {
+  if (typeof backup !== 'object' || backup === null || Array.isArray(backup)) {
+    return fail('Invalid backup');
+  }
+  const prepared = prepareImport(JSON.stringify(backup), NX200_PROCEDURES, NX200_MAINTENANCE_PLAN);
+  if (!prepared.ok) return fail(prepared.error);
+  const digest = createHash('sha256')
+    .update(`garage-import:v${IMPORT_NORMALIZATION_VERSION}:${canonicalJson(prepared.state)}`)
+    .digest('hex');
+  return { ...prepared, digest };
 }
 
 export class GarageService {
@@ -177,16 +262,7 @@ export class GarageService {
         };
       }
       if (!garage) throw new Error('Motorcycle has no garage row');
-      const state = snapshotState(motorcycle, garage.settings, {
-        maintenancePlan: await repo.maintenance.list(motorcycle.id),
-        serviceHistory: await repo.service.list(motorcycle.id),
-        odometerHistory: await repo.odometer.list(motorcycle.id),
-        procedureExecutions: await repo.procedure.list(motorcycle.id),
-        fuelHistory: await repo.fuel.list(motorcycle.id),
-        expenseHistory: await repo.expense.list(motorcycle.id),
-        occurrenceHistory: await repo.occurrence.list(motorcycle.id),
-        safetyCheckHistory: await repo.safety.list(motorcycle.id),
-      });
+      const state = await loadState(repo, motorcycle, garage.settings);
       const valid = validateGarageState(state, NX200_PROCEDURES);
       if (!valid.valid) throw new Error('Stored Garage state is invalid');
       const hasHistory =
@@ -217,6 +293,7 @@ export class GarageService {
     key: string,
     body: unknown,
     mutation: (context: WriteContext, payload: unknown) => Promise<readonly string[]>,
+    requestHash?: (payload: unknown) => string,
   ): Promise<WriteResult<{ ids: readonly string[] }>> {
     const envelope = object(body, ['expectedRevision', 'payload']);
     if (envelope['expectedRevision'] === undefined) {
@@ -225,9 +302,11 @@ export class GarageService {
     const expected = revision(envelope['expectedRevision']);
     const payload = envelope['payload'];
     if (payload === undefined) fail('Missing payload');
-    const hash = createHash('sha256')
-      .update(canonical({ type, expectedRevision: String(expected), payload }))
-      .digest('hex');
+    const hash =
+      requestHash?.(payload) ??
+      createHash('sha256')
+        .update(canonical({ type, expectedRevision: String(expected), payload }))
+        .digest('hex');
     return inTransaction(this.pool, async (client) => {
       const repo = repositories(client);
       await repo.garage.lock();
@@ -796,6 +875,182 @@ export class GarageService {
       await repo.procedure.update(result.execution);
       return [executionId];
     });
+  }
+
+  createMaintenanceItem(
+    key: string,
+    body: unknown,
+  ): Promise<WriteResult<{ ids: readonly string[] }>> {
+    return this.write(
+      'createMaintenanceItem',
+      key,
+      body,
+      async ({ repo, motorcycle, now }, payload) => {
+        const current = configured(motorcycle);
+        const input = object(payload, ['title', 'category', ...SCHEDULE_FIELDS]);
+        const item = unwrap(
+          createUserMaintenanceItem(
+            {
+              ...scheduleInput(input),
+              title: string(input['title'], 'title', 80),
+              category: choice(input['category'], 'category', MAINTENANCE_CATEGORIES),
+            },
+            `${USER_PLAN_ITEM_ID_PREFIX}${randomUUID()}`,
+            now,
+          ),
+        );
+        await repo.maintenance.insert(current.id, item);
+        return [item.id];
+      },
+    );
+  }
+
+  updateMaintenanceItem(
+    key: string,
+    body: unknown,
+  ): Promise<WriteResult<{ ids: readonly string[] }>> {
+    return this.write(
+      'updateMaintenanceItem',
+      key,
+      body,
+      async ({ repo, motorcycle, now }, payload) => {
+        const current = configured(motorcycle);
+        const input = object(payload, ['itemId', 'title', 'category', ...SCHEDULE_FIELDS]);
+        const item = await findPlanItem(repo, current.id, input['itemId']);
+        const updated = unwrap(
+          updateUserMaintenanceItem(
+            item,
+            {
+              ...scheduleInput(input),
+              title: string(input['title'], 'title', 80),
+              category: choice(input['category'], 'category', MAINTENANCE_CATEGORIES),
+            },
+            now,
+          ),
+        );
+        await repo.maintenance.updateUserFields(current.id, updated);
+        return [updated.id];
+      },
+    );
+  }
+
+  setMaintenanceSchedule(
+    key: string,
+    body: unknown,
+  ): Promise<WriteResult<{ ids: readonly string[] }>> {
+    return this.write(
+      'setMaintenanceSchedule',
+      key,
+      body,
+      async ({ repo, motorcycle, now }, payload) => {
+        const current = configured(motorcycle);
+        const input = object(payload, ['itemId', 'schedule']);
+        const item = await findPlanItem(repo, current.id, input['itemId']);
+        const schedule =
+          input['schedule'] === null
+            ? null
+            : scheduleInput(object(input['schedule'], [...SCHEDULE_FIELDS]));
+        const updated = unwrap(applyUserSchedule(item, schedule, now));
+        await repo.maintenance.updateUserFields(current.id, updated);
+        return [updated.id];
+      },
+    );
+  }
+
+  removeMaintenanceItem(
+    key: string,
+    body: unknown,
+  ): Promise<WriteResult<{ ids: readonly string[] }>> {
+    return this.write('removeMaintenanceItem', key, body, async ({ repo, motorcycle }, payload) => {
+      const current = configured(motorcycle);
+      const input = object(payload, ['itemId']);
+      const item = await findPlanItem(repo, current.id, input['itemId']);
+      const error = planItemRemovalError(item, await repo.service.list(current.id));
+      if (error) fail(error, 'VALIDATION', 409);
+      await repo.maintenance.delete(current.id, item.id);
+      return [item.id];
+    });
+  }
+
+  /** Prévia somente leitura da importação: não grava nada. */
+  async previewImport(body: unknown): Promise<ImportPreview> {
+    const input = object(body, ['backup']);
+    const prepared = prepareImportPayload(input['backup']);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      await client.query('SET LOCAL search_path TO public, pg_catalog');
+      const repo = repositories(client);
+      const garage = await repo.garage.get();
+      const motorcycle = await repo.motorcycle.get();
+      await client.query('COMMIT');
+      return {
+        digest: prepared.digest,
+        summary: prepared.summary,
+        excludedDemoServices: prepared.excludedDemoServices,
+        target: motorcycle ? 'occupied' : 'empty',
+        settings: garage ? 'keep-remote' : 'use-imported',
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Importa um backup em garagem vazia, preservando IDs e instantes, numa única transação. O
+   * resultado é relido e comparado com o conteúdo importado; qualquer diferença desfaz tudo.
+   */
+  importBackup(key: string, body: unknown): Promise<WriteResult<{ ids: readonly string[] }>> {
+    const digestOf = (payload: unknown): string =>
+      prepareImportPayload(object(payload, ['backup', 'digest'])['backup']).digest;
+    return this.write(
+      'import',
+      key,
+      body,
+      async ({ repo, motorcycle, settings }, payload) => {
+        const input = object(payload, ['backup', 'digest']);
+        const prepared = prepareImportPayload(input['backup']);
+        if (input['digest'] !== prepared.digest) {
+          fail('The backup changed after the preview; run the preview again', 'VALIDATION', 409);
+        }
+        if (await repo.write.findImport(prepared.digest)) {
+          fail('This backup was already imported', 'IDEMPOTENCY_CONFLICT', 409);
+        }
+        if (motorcycle) fail('Import requires an empty garage', 'REVISION_CONFLICT', 409);
+        const { state } = prepared;
+        const finalSettings = settings ?? state.settings;
+        if (!settings) await repo.garage.create(finalSettings);
+        const moto = state.motorcycle;
+        await repo.motorcycle.insert(moto);
+        for (const execution of state.procedureExecutions) {
+          await repo.procedure.insert({ ...execution, resultingServiceRecordId: undefined });
+        }
+        for (const item of state.maintenancePlan) await repo.maintenance.insert(moto.id, item);
+        for (const service of state.serviceHistory) await repo.service.insert(service, moto.id);
+        for (const fuel of state.fuelHistory) await repo.fuel.insert(fuel);
+        for (const odometer of state.odometerHistory) await repo.odometer.insert(odometer);
+        for (const expense of state.expenseHistory) await repo.expense.insert(expense);
+        for (const occurrence of state.occurrenceHistory) await repo.occurrence.insert(occurrence);
+        for (const check of state.safetyCheckHistory) await repo.safety.insert(check);
+
+        const stored = await loadState(repo, moto, finalSettings);
+        if (!validateGarageState(stored, NX200_PROCEDURES).valid) {
+          throw new Error('Imported Garage state is invalid');
+        }
+        if (comparableImportState(stored) !== comparableImportState(state)) {
+          fail(
+            'The import would not preserve the data exactly; nothing was saved',
+            'VALIDATION',
+            422,
+          );
+        }
+        return [moto.id];
+      },
+      digestOf,
+    );
   }
 
   updateSettings(key: string, body: unknown): Promise<WriteResult<{ ids: readonly string[] }>> {

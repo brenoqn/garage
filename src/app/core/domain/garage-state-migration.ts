@@ -9,6 +9,10 @@ import { Procedure } from '../models/procedure.model';
 import { ProcedureExecution } from '../models/procedure-execution.model';
 import { ServiceRecord } from '../models/service-record.model';
 import { SafetyCheckRecord } from '../models/safety-check.model';
+import { isValidUserSchedule, planItemIntegrityError } from './maintenance-plan';
+
+/** Item do plano até o schema 4, antes da origem e do intervalo definido pelo usuário. */
+export type MaintenancePlanItemV4 = Omit<MaintenancePlanItem, 'origin' | 'userSchedule'>;
 
 interface GarageSettingsV3 {
   readonly maintenanceAlertsEnabled: boolean;
@@ -17,7 +21,7 @@ interface GarageSettingsV3 {
 interface GarageStateV1 {
   readonly version: 1;
   readonly motorcycle: Motorcycle;
-  readonly maintenancePlan: readonly MaintenancePlanItem[];
+  readonly maintenancePlan: readonly MaintenancePlanItemV4[];
   readonly serviceHistory: readonly ServiceRecord[];
   readonly settings: GarageSettingsV3;
 }
@@ -25,7 +29,7 @@ interface GarageStateV1 {
 export interface GarageStateV2 {
   readonly schemaVersion: 2;
   readonly motorcycle: Motorcycle;
-  readonly maintenancePlan: readonly MaintenancePlanItem[];
+  readonly maintenancePlan: readonly MaintenancePlanItemV4[];
   readonly serviceHistory: readonly ServiceRecord[];
   readonly odometerHistory: readonly OdometerRecord[];
   readonly settings: GarageSettingsV3;
@@ -35,12 +39,17 @@ export interface GarageStateV2 {
 export interface GarageStateV3 {
   readonly schemaVersion: 3;
   readonly motorcycle: Motorcycle;
-  readonly maintenancePlan: readonly MaintenancePlanItem[];
+  readonly maintenancePlan: readonly MaintenancePlanItemV4[];
   readonly serviceHistory: readonly ServiceRecord[];
   readonly odometerHistory: readonly OdometerRecord[];
   readonly procedureExecutions: readonly ProcedureExecution[];
   readonly settings: GarageSettingsV3;
   readonly setup: GarageSetup;
+}
+
+export interface GarageStateV4 extends Omit<GarageState, 'schemaVersion' | 'maintenancePlan'> {
+  readonly schemaVersion: 4;
+  readonly maintenancePlan: readonly MaintenancePlanItemV4[];
 }
 
 export type GarageStateValidation =
@@ -49,6 +58,10 @@ export type GarageStateValidation =
 
 export type GarageStateV2Validation =
   | { readonly valid: true; readonly state: GarageStateV2 }
+  | { readonly valid: false; readonly error: string };
+
+export type GarageStateV4Validation =
+  | { readonly valid: true; readonly state: GarageStateV4 }
   | { readonly valid: false; readonly error: string };
 
 export type GarageStateV3Validation =
@@ -146,10 +159,18 @@ function isMaintenanceExecution(value: unknown): boolean {
   );
 }
 
-function isMaintenancePlanItem(value: unknown): value is MaintenancePlanItem {
+function isMaintenancePlanItem(value: unknown, schemaV5: boolean): boolean {
   const categories = ['engine', 'transmission', 'electrical', 'controls', 'brakes', 'general'];
+  if (!isRecord(value)) return false;
+  if (schemaV5) {
+    if (value['origin'] !== 'catalog' && value['origin'] !== 'user') return false;
+    if (value['userSchedule'] !== undefined && !isValidUserSchedule(value['userSchedule'])) {
+      return false;
+    }
+  } else if (value['origin'] !== undefined || value['userSchedule'] !== undefined) {
+    return false;
+  }
   return (
-    isRecord(value) &&
     isNonEmptyString(value['id']) &&
     isNonEmptyString(value['title']) &&
     typeof value['category'] === 'string' &&
@@ -362,13 +383,20 @@ function validateBaseFields(
   value: UnknownRecord,
   includeV2Fields: boolean,
   includeTheme: boolean,
+  planV5 = false,
 ): string | null {
   if (!isMotorcycle(value['motorcycle'])) return 'Os dados da motocicleta são inválidos.';
   if (
     !Array.isArray(value['maintenancePlan']) ||
-    !value['maintenancePlan'].every(isMaintenancePlanItem)
+    !value['maintenancePlan'].every((item) => isMaintenancePlanItem(item, planV5))
   ) {
     return 'O plano de manutenção é inválido.';
+  }
+  if (planV5) {
+    for (const item of value['maintenancePlan'] as readonly MaintenancePlanItem[]) {
+      const integrity = planItemIntegrityError(item);
+      if (integrity) return integrity;
+    }
   }
   if (!Array.isArray(value['serviceHistory']) || !value['serviceHistory'].every(isServiceRecord)) {
     return 'O histórico de serviços é inválido.';
@@ -377,7 +405,7 @@ function validateBaseFields(
     return 'As configurações são inválidas.';
   }
 
-  const maintenancePlan = value['maintenancePlan'] as readonly MaintenancePlanItem[];
+  const maintenancePlan = value['maintenancePlan'] as readonly MaintenancePlanItemV4[];
   const serviceHistory = value['serviceHistory'] as readonly ServiceRecord[];
   if (!hasUniqueIds(maintenancePlan)) return 'O plano contém identificadores duplicados.';
   if (!hasUniqueIds(serviceHistory))
@@ -610,6 +638,20 @@ export function validateGarageState(
   value: unknown,
   procedures: readonly Procedure[] = [],
 ): GarageStateValidation {
+  if (!isRecord(value) || value['schemaVersion'] !== 5) {
+    return { valid: false, error: 'O estado não usa o schema 5 do Garage.' };
+  }
+  const error =
+    validateBaseFields(value, true, true, true) ??
+    validateExecutionReferences(value, procedures) ??
+    validateDailyUseCollections(value);
+  return error ? { valid: false, error } : { valid: true, state: value as unknown as GarageState };
+}
+
+export function validateGarageStateV4(
+  value: unknown,
+  procedures: readonly Procedure[] = [],
+): GarageStateV4Validation {
   if (!isRecord(value) || value['schemaVersion'] !== 4) {
     return { valid: false, error: 'O estado não usa o schema 4 do Garage.' };
   }
@@ -617,7 +659,9 @@ export function validateGarageState(
     validateBaseFields(value, true, true) ??
     validateExecutionReferences(value, procedures) ??
     validateDailyUseCollections(value);
-  return error ? { valid: false, error } : { valid: true, state: value as unknown as GarageState };
+  return error
+    ? { valid: false, error }
+    : { valid: true, state: value as unknown as GarageStateV4 };
 }
 
 export function validateGarageStateV3(
@@ -666,7 +710,7 @@ export function migrateGarageStateV2(value: GarageStateV2): GarageStateV3 {
   return { ...value, schemaVersion: 3, procedureExecutions: [] };
 }
 
-export function migrateGarageStateV3(value: GarageStateV3): GarageState {
+export function migrateGarageStateV3(value: GarageStateV3): GarageStateV4 {
   return {
     ...value,
     schemaVersion: 4,
@@ -678,8 +722,22 @@ export function migrateGarageStateV3(value: GarageStateV3): GarageState {
   };
 }
 
+/**
+ * v4 → v5: todos os itens existentes vêm do catálogo. Nenhum intervalo do usuário é criado
+ * automaticamente; IDs, execuções e referências são preservados.
+ */
+export function migrateGarageStateV4(value: GarageStateV4): GarageState {
+  return {
+    ...value,
+    schemaVersion: 5,
+    maintenancePlan: value.maintenancePlan.map((item) => ({ ...item, origin: 'catalog' })),
+  };
+}
+
 export function migrateGarageStateV1(value: GarageStateV1): GarageState {
-  return migrateGarageStateV3(migrateGarageStateV2(migrateGarageStateV1ToV2(value)));
+  return migrateGarageStateV4(
+    migrateGarageStateV3(migrateGarageStateV2(migrateGarageStateV1ToV2(value))),
+  );
 }
 
 export function decodeStoredGarageState(
@@ -701,7 +759,7 @@ export function decodeStoredGarageState(
   }
 
   if (isRecord(parsed) && typeof parsed['schemaVersion'] === 'number') {
-    if (parsed['schemaVersion'] > 4) {
+    if (parsed['schemaVersion'] > 5) {
       return {
         kind: 'future-version',
         state: safeState,
@@ -715,7 +773,9 @@ export function decodeStoredGarageState(
       return validation.valid
         ? {
             kind: 'migrated',
-            state: migrateGarageStateV3(migrateGarageStateV2(validation.state)),
+            state: migrateGarageStateV4(
+              migrateGarageStateV3(migrateGarageStateV2(validation.state)),
+            ),
           }
         : {
             kind: 'invalid-state',
@@ -727,7 +787,18 @@ export function decodeStoredGarageState(
     if (parsed['schemaVersion'] === 3) {
       const validation = validateGarageStateV3(parsed, procedures);
       return validation.valid
-        ? { kind: 'migrated', state: migrateGarageStateV3(validation.state) }
+        ? { kind: 'migrated', state: migrateGarageStateV4(migrateGarageStateV3(validation.state)) }
+        : {
+            kind: 'invalid-state',
+            state: safeState,
+            rawValue,
+            message: `${validation.error} O conteúdo original foi preservado.`,
+          };
+    }
+    if (parsed['schemaVersion'] === 4) {
+      const validation = validateGarageStateV4(parsed, procedures);
+      return validation.valid
+        ? { kind: 'migrated', state: migrateGarageStateV4(validation.state) }
         : {
             kind: 'invalid-state',
             state: safeState,

@@ -49,10 +49,10 @@ const urgency = { overdue: 5, due: 4, upcoming: 3, ok: 2, unknown: 1 } as const;
       } @else if (!store.setup().completed) {
         <section class="setup-banner" role="status">
           <div>
-            <strong>Você está vendo dados demonstrativos</strong>
+            <strong>Bem-vindo ao Garage</strong>
             <p>
-              A quilometragem e os serviços abaixo não foram confirmados como dados da sua
-              motocicleta. Alertas operacionais estão pausados.
+              Comece confirmando o apelido, o ano e a quilometragem atual da sua NX200. Depois disso
+              você registra serviços, abastecimentos e define seus próprios lembretes.
             </p>
           </div>
           <a class="button button-primary" routerLink="/motorcycle">Configurar minha NX200</a>
@@ -62,10 +62,15 @@ const urgency = { overdue: 5, due: 4, upcoming: 3, ok: 2, unknown: 1 } as const;
       <section class="bike-hero" aria-labelledby="mileage-title">
         <div class="bike-hero-content">
           <span id="mileage-title">
-            {{ store.setup().completed ? 'Quilometragem atual' : 'Quilometragem demonstrativa' }}
+            {{ store.setup().completed ? 'Quilometragem atual' : 'Quilometragem' }}
           </span>
-          <strong>{{ motorcycle().currentMileage.toLocaleString('pt-BR') }}</strong>
-          <small>quilômetros</small>
+          @if (store.setup().completed) {
+            <strong>{{ motorcycle().currentMileage.toLocaleString('pt-BR') }}</strong>
+            <small>quilômetros</small>
+          } @else {
+            <strong>—</strong>
+            <small>ainda não informada</small>
+          }
         </div>
         <div class="bike-visual" aria-hidden="true">
           <span>NX</span>
@@ -83,7 +88,11 @@ const urgency = { overdue: 5, due: 4, upcoming: 3, ok: 2, unknown: 1 } as const;
                 inputmode="numeric"
                 [formControl]="mileageControl"
               />
-              <button class="button button-light" type="submit" [disabled]="mileageControl.invalid">
+              <button
+                class="button button-light"
+                type="submit"
+                [disabled]="mileageControl.invalid || store.busy()"
+              >
                 Salvar
               </button>
             </div>
@@ -136,7 +145,11 @@ const urgency = { overdue: 5, due: 4, upcoming: 3, ok: 2, unknown: 1 } as const;
             <button class="button button-secondary" type="button" (click)="cancelRegression()">
               Cancelar
             </button>
-            <button class="button button-danger" type="submit" [disabled]="regressionForm.invalid">
+            <button
+              class="button button-danger"
+              type="submit"
+              [disabled]="regressionForm.invalid || store.busy()"
+            >
               Confirmar correção
             </button>
           </div>
@@ -419,12 +432,12 @@ export class DashboardPage {
       : [],
   );
 
-  protected updateMileage(): void {
+  protected async updateMileage(): Promise<void> {
     if (this.mileageControl.invalid) {
       return;
     }
     this.mileageMessage.set('');
-    const result = this.store.updateMileage({
+    const result = await this.store.updateMileage({
       mileage: this.mileageControl.getRawValue(),
       source: 'dashboard',
     });
@@ -442,13 +455,13 @@ export class DashboardPage {
     this.mileageMessage.set('Odômetro atualizado e registrado no histórico.');
   }
 
-  protected confirmRegression(): void {
+  protected async confirmRegression(): Promise<void> {
     if (this.regressionForm.invalid) {
       this.regressionForm.markAllAsTouched();
       return;
     }
     const regression = this.regressionForm.getRawValue();
-    const result = this.store.updateMileage({
+    const result = await this.store.updateMileage({
       mileage: this.mileageControl.getRawValue(),
       source: regression.source,
       note: regression.note,

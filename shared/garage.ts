@@ -51,15 +51,33 @@ export interface MaintenanceExecution {
   readonly mileage: number;
   readonly serviceRecordId?: string;
 }
-export interface MaintenancePlanItem {
-  readonly id: string;
-  readonly title: string;
-  readonly category: MaintenanceCategory;
-  readonly procedureSlug?: string;
+/** `catalog`: item do catálogo editorial do modelo. `user`: item criado pelo proprietário. */
+export type MaintenancePlanOrigin = 'catalog' | 'user';
+/**
+ * Intervalo escolhido pelo proprietário. Não é uma afirmação técnica: vale somente para a
+ * moto dele, é exibido como "definido por você" e nunca altera o conteúdo editorial.
+ */
+export interface UserMaintenanceSchedule {
   readonly intervalKm?: number;
   readonly intervalDays?: number;
   readonly warningKm?: number;
   readonly warningDays?: number;
+  readonly note?: string;
+  readonly updatedAt: string;
+}
+export interface MaintenancePlanItem {
+  readonly id: string;
+  readonly title: string;
+  readonly category: MaintenanceCategory;
+  readonly origin: MaintenancePlanOrigin;
+  readonly procedureSlug?: string;
+  /** Intervalo do catálogo; só é operacional quando `technicalSource` está confirmado. */
+  readonly intervalKm?: number;
+  readonly intervalDays?: number;
+  readonly warningKm?: number;
+  readonly warningDays?: number;
+  /** Intervalo do proprietário; quando presente, é o que conta para lembretes. */
+  readonly userSchedule?: UserMaintenanceSchedule;
   readonly lastExecution?: MaintenanceExecution;
   readonly technicalSource: TechnicalSource;
 }
@@ -216,7 +234,7 @@ export interface SafetyCheckRecord {
 }
 export type NewSafetyCheckRecord = Omit<SafetyCheckRecord, 'id' | 'motorcycleId' | 'createdAt'>;
 export interface GarageState {
-  readonly schemaVersion: 4;
+  readonly schemaVersion: 5;
   readonly motorcycle: Motorcycle;
   readonly maintenancePlan: readonly MaintenancePlanItem[];
   readonly serviceHistory: readonly ServiceRecord[];
@@ -248,6 +266,28 @@ export interface GarageSnapshot {
   readonly status: 'not-configured' | 'configured-empty' | 'configured-with-history';
   readonly settings?: GarageSettings;
   readonly state?: GarageState;
+}
+/** Contagens exibidas na prévia de backup e de importação. */
+export interface GarageBackupSummary {
+  readonly motorcycle: string;
+  readonly year: number;
+  readonly currentMileage: number;
+  readonly serviceRecords: number;
+  readonly odometerRecords: number;
+  readonly maintenanceItems: number;
+  readonly procedureExecutions: number;
+  readonly fuelRecords: number;
+  readonly expenseRecords: number;
+  readonly occurrenceRecords: number;
+  readonly safetyChecks: number;
+}
+/** Resposta de `POST /api/garage/import/preview`. */
+export interface ImportPreview {
+  readonly digest: string;
+  readonly summary: GarageBackupSummary;
+  readonly excludedDemoServices: number;
+  readonly target: 'empty' | 'occupied';
+  readonly settings: 'keep-remote' | 'use-imported';
 }
 export interface WriteCommand<T> {
   readonly expectedRevision: string;

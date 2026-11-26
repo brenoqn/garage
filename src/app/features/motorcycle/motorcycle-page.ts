@@ -24,11 +24,10 @@ import { GarageStore } from '../../core/services/garage-store.service';
 
       @if (!store.setup().completed) {
         <section class="setup-banner" role="status">
-          <strong>Os dados atuais são demonstrativos</strong>
+          <strong>Primeiro passo: sua motocicleta</strong>
           <p>
-            Confirme o apelido, o ano e a quilometragem real da sua motocicleta. Até concluir esta
-            etapa, o Garage não emite alertas operacionais. Os exemplos permanecem identificados
-            como demonstração e não substituem seus registros.
+            Confirme o apelido, o ano e a quilometragem que aparece no painel agora. Até concluir
+            esta etapa, o Garage não emite alertas nem permite registros.
           </p>
         </section>
       }
@@ -98,7 +97,7 @@ import { GarageStore } from '../../core/services/garage-store.service';
             <button
               class="button button-primary"
               type="submit"
-              [disabled]="form.invalid || !!store.recovery()"
+              [disabled]="form.invalid || !!store.recovery() || store.busy()"
             >
               {{ store.setup().completed ? 'Salvar alterações' : 'Concluir configuração' }}
             </button>
@@ -142,7 +141,7 @@ import { GarageStore } from '../../core/services/garage-store.service';
               <button
                 class="button button-danger"
                 type="submit"
-                [disabled]="regressionForm.invalid"
+                [disabled]="regressionForm.invalid || store.busy()"
               >
                 Confirmar correção
               </button>
@@ -211,7 +210,7 @@ export class MotorcyclePage {
     confirmed: [false, Validators.requiredTrue],
   });
 
-  protected save(): void {
+  protected async save(): Promise<void> {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
@@ -221,7 +220,7 @@ export class MotorcyclePage {
     const value = this.form.getRawValue();
     if (!this.store.setup().completed) {
       if (
-        this.store.completeSetup({
+        await this.store.completeSetup({
           nickname: value.nickname.trim(),
           year: value.year,
           currentMileage: value.currentMileage,
@@ -234,7 +233,7 @@ export class MotorcyclePage {
       return;
     }
 
-    const result = this.store.saveMotorcycle(
+    const result = await this.store.saveMotorcycle(
       { nickname: value.nickname.trim(), year: value.year },
       { mileage: value.currentMileage, source: 'motorcycle' },
     );
@@ -250,14 +249,14 @@ export class MotorcyclePage {
     this.saved.set(true);
   }
 
-  protected confirmRegression(): void {
+  protected async confirmRegression(): Promise<void> {
     if (this.regressionForm.invalid || this.form.invalid) {
       this.regressionForm.markAllAsTouched();
       return;
     }
     const value = this.form.getRawValue();
     const regression = this.regressionForm.getRawValue();
-    const result = this.store.saveMotorcycle(
+    const result = await this.store.saveMotorcycle(
       { nickname: value.nickname.trim(), year: value.year },
       {
         mileage: value.currentMileage,

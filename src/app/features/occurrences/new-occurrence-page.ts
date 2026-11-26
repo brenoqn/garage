@@ -82,7 +82,11 @@ import { GarageStore } from '../../core/services/garage-store.service';
         }
         <div class="form-actions sticky-form-actions">
           <a class="button button-secondary" routerLink="/history">Cancelar</a
-          ><button class="button button-primary" type="submit" [disabled]="form.invalid">
+          ><button
+            class="button button-primary"
+            type="submit"
+            [disabled]="form.invalid || store.busy()"
+          >
             Salvar ocorrência
           </button>
         </div>
@@ -111,13 +115,13 @@ export class NewOccurrencePage {
     severity: this.formBuilder.nonNullable.control<OccurrenceSeverity>('note'),
     notes: ['', Validators.maxLength(500)],
   });
-  protected save(): void {
+  protected async save(): Promise<void> {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
     }
     const value = this.form.getRawValue();
-    const record = this.store.addOccurrence({
+    const record = await this.store.addOccurrence({
       ...value,
       occurredAt: new Date(value.occurredAt).toISOString(),
     });

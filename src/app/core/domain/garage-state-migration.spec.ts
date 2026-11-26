@@ -7,6 +7,7 @@ import {
   migrateGarageStateV1,
   migrateGarageStateV2,
   migrateGarageStateV3,
+  migrateGarageStateV4,
   validateGarageState,
 } from './garage-state-migration';
 
@@ -39,7 +40,8 @@ const stateV2: GarageStateV2 = {
   setup: { completed: true, demoData: false },
 };
 const stateV3 = migrateGarageStateV2(stateV2);
-const safeState: GarageState = migrateGarageStateV3(stateV3);
+const stateV4 = migrateGarageStateV3(stateV3);
+const safeState: GarageState = migrateGarageStateV4(stateV4);
 
 describe('garage state migration', () => {
   it('migrates schema 2 to schema 3 preserving every existing field', () => {
@@ -60,17 +62,19 @@ describe('garage state migration', () => {
     expect(migrated.motorcycle).toEqual(stateV3.motorcycle);
   });
 
-  it('chains schema 1 through schema 4 without losing existing data', () => {
+  it('chains schema 1 through schema 5 without losing existing data', () => {
     const migrated = migrateGarageStateV1(legacyState);
-    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.schemaVersion).toBe(5);
     expect(migrated.motorcycle).toEqual(legacyState.motorcycle);
-    expect(migrated.maintenancePlan).toEqual(legacyState.maintenancePlan);
+    expect(migrated.maintenancePlan).toEqual(
+      legacyState.maintenancePlan.map((item) => ({ ...item, origin: 'catalog' })),
+    );
     expect(migrated.odometerHistory[0]?.mileage).toBe(12_345);
     expect(migrated.procedureExecutions).toEqual([]);
   });
 
-  it('is idempotent once the state reaches schema 4', () => {
-    const migrated = migrateGarageStateV3(migrateGarageStateV2(stateV2));
+  it('is idempotent once the state reaches schema 5', () => {
+    const migrated = migrateGarageStateV4(migrateGarageStateV3(migrateGarageStateV2(stateV2)));
     const decoded = decodeStoredGarageState(JSON.stringify(migrated), safeState, NX200_PROCEDURES);
     expect(decoded.kind).toBe('current');
     expect(decoded.state).toEqual(migrated);
@@ -91,7 +95,7 @@ describe('garage state migration', () => {
   it('detects schema 3 and migrates it exactly once', () => {
     const first = decodeStoredGarageState(JSON.stringify(stateV3), safeState, NX200_PROCEDURES);
     expect(first.kind).toBe('migrated');
-    expect(first.state.schemaVersion).toBe(4);
+    expect(first.state.schemaVersion).toBe(5);
     const second = decodeStoredGarageState(
       JSON.stringify(first.state),
       safeState,
@@ -109,8 +113,64 @@ describe('garage state migration', () => {
     expect(decoded.state).toBe(safeState);
   });
 
+  it('migrates schema 4 to schema 5 marking every plan item as catalog, exactly once', () => {
+    const executed = {
+      ...stateV4,
+      maintenancePlan: [{ ...plan[0]!, lastExecution: { date: '2026-07-01', mileage: 12_000 } }],
+    };
+    const first = decodeStoredGarageState(JSON.stringify(executed), safeState, NX200_PROCEDURES);
+    expect(first.kind).toBe('migrated');
+    expect(first.state.schemaVersion).toBe(5);
+    expect(first.state.maintenancePlan).toEqual([
+      { ...executed.maintenancePlan[0], origin: 'catalog' },
+    ]);
+    expect(first.state.maintenancePlan[0]?.userSchedule).toBeUndefined();
+    const second = decodeStoredGarageState(
+      JSON.stringify(first.state),
+      safeState,
+      NX200_PROCEDURES,
+    );
+    expect(second.kind).toBe('current');
+    expect(second.state).toEqual(first.state);
+  });
+
+  it('rejects schema 4 states that already carry schema 5 plan fields', () => {
+    const mixed = { ...stateV4, maintenancePlan: [{ ...plan[0]!, origin: 'catalog' }] };
+    expect(decodeStoredGarageState(JSON.stringify(mixed), safeState).kind).toBe('invalid-state');
+  });
+
+  it('validates owner-defined plan items and schedules in schema 5', () => {
+    const userItem = {
+      id: 'user-tires',
+      title: 'Calibragem',
+      category: 'general' as const,
+      origin: 'user' as const,
+      userSchedule: { intervalDays: 15, updatedAt: '2026-11-26T10:00:00.000Z' },
+      technicalSource: source,
+    };
+    const withUser = { ...safeState, maintenancePlan: [...safeState.maintenancePlan, userItem] };
+    expect(validateGarageState(withUser).valid).toBe(true);
+    const cases = [
+      { ...userItem, id: 'tires' },
+      { ...userItem, userSchedule: undefined },
+      { ...userItem, userSchedule: { intervalDays: 0, updatedAt: '2026-11-26T10:00:00.000Z' } },
+      { ...userItem, origin: 'other' },
+      { ...userItem, technicalSource: { status: 'confirmed', label: 'Inventada' } },
+    ];
+    for (const item of cases) {
+      expect(validateGarageState({ ...safeState, maintenancePlan: [item] }).valid).toBe(false);
+    }
+    expect(
+      validateGarageState({
+        ...safeState,
+        maintenancePlan: [{ ...plan[0]!, origin: 'catalog', id: 'user-oil' }],
+      }).valid,
+    ).toBe(false);
+  });
+
   it('does not accept a future schema version', () => {
     expect(decodeStoredGarageState('{"schemaVersion":99}', safeState).kind).toBe('future-version');
+    expect(decodeStoredGarageState('{"schemaVersion":6}', safeState).kind).toBe('future-version');
   });
 
   it('rejects invalid execution references and duplicate active executions', () => {

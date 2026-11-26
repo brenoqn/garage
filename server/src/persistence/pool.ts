@@ -1,8 +1,8 @@
 import { Pool } from 'pg';
 import type { PoolClient } from 'pg';
-import type { ServerConfig } from '../config/env';
+import type { DatabaseConfig } from '../config/env';
 
-export function createPool(config: ServerConfig): Pool {
+export function createPool(config: DatabaseConfig): Pool {
   return new Pool(config.database);
 }
 

@@ -1,0 +1,28 @@
+# Garage API: bundle autocontido (Express + pg) sobre Node.js 24, sem node_modules em runtime.
+FROM node:24-alpine AS build
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm install --global "$(node -p 'require("./package.json").packageManager')"
+RUN npm ci
+
+COPY . .
+RUN npm run server:typecheck && npm run server:bundle
+
+FROM node:24-alpine AS runtime
+
+ENV NODE_ENV=production
+WORKDIR /app
+
+COPY --from=build /app/dist/garage-api-bundle/ ./dist/garage-api/
+COPY server/migrations/ ./server/migrations/
+
+USER node
+EXPOSE 3001
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:3001/health >/dev/null || exit 1
+
+# Migrations nunca rodam no startup. Aplique explicitamente com:
+#   node dist/garage-api/migrate-cli.mjs
+CMD ["node", "dist/garage-api/index.mjs"]

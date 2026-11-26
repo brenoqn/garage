@@ -8,6 +8,7 @@ import { NewFuelPage } from './new-fuel-page';
 class MemoryStorage {
   private value = JSON.stringify({
     ...INITIAL_GARAGE_STATE,
+    motorcycle: { ...INITIAL_GARAGE_STATE.motorcycle, currentMileage: 28_750 },
     setup: { completed: true, demoData: false },
   });
   getRaw(): string {
@@ -49,6 +50,7 @@ describe('NewFuelPage', () => {
     ) as HTMLButtonElement;
     expect(submit.disabled).toBe(false);
     submit.click();
+    await new Promise((resolve) => setTimeout(resolve));
     fixture.detectChanges();
     expect(router.navigate).toHaveBeenCalledWith(['/fuel']);
   });
