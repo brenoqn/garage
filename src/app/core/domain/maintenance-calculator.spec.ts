@@ -12,6 +12,7 @@ function planItem(changes: Partial<MaintenancePlanItem> = {}): MaintenancePlanIt
     id: 'test',
     title: 'Item de teste',
     category: 'general',
+    origin: 'catalog',
     intervalKm: 1000,
     warningKm: 200,
     lastExecution: { date: '2026-01-01', mileage: 10000 },

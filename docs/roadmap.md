@@ -78,6 +78,18 @@
 - [x] backup schema 4 e importação compatível com schemas 2 e 3;
 - [x] testes de consumo, migração, abastecimento histórico, checklist, store e componentes.
 
+## Sprint 6A — uso real sem dados inventados
+
+- [x] estado inicial limpo: sem serviços, execuções ou quilometragem demonstrativos;
+- [x] primeiro uso guiado e “recomeçar do zero” preservando preferências;
+- [x] schema 5 e migração idempotente v4 → v5, preservando a cadeia anterior;
+- [x] itens de manutenção criados pelo proprietário, com ID reservado e sem fonte técnica;
+- [x] intervalo próprio em qualquer item, exibido como “definido por você” e separado do catálogo;
+- [x] lembretes a partir do intervalo do usuário; transcrições pendentes continuam sem alerta;
+- [x] backup schema 5 com importação compatível com schemas 2, 3 e 4;
+- [x] migration `002_user_maintenance_schedule.sql`, repositories e comandos do backend;
+- [ ] executar `npm run server:test` em PostgreSQL descartável com a migration 002.
+
 ## Próximas iterações
 
 ### Fase 3 — backend isolado (código implementado, sem ativação)
@@ -88,10 +100,16 @@
 - [x] repositories específicos, transações, revisão e idempotência;
 - [x] casos de uso iniciais e snapshot remoto sem seed demonstrativo;
 - [x] testes em PostgreSQL descartável para migration, rollback, constraints, API e concorrência;
-- [ ] aplicar migration no `garage_db` somente após checkpoint e autorização;
-- [ ] comprovar barreira de acesso e rota do domínio antes de publicar a API;
-- [ ] integrar o Angular à API depois de estabilizar os contratos;
-- [ ] implementar e validar importação explícita do backup local para destino vazio.
+- [x] barreira escolhida: Cloudflare Access no domínio inteiro, com validação do JWT na API;
+- [x] API recusa iniciar sem Access fora do loopback;
+- [x] importação explícita com prévia, hash, destino vazio, IDs preservados e conferência;
+- [x] container `garage-api` autocontido, publicação no CI e roteiro de ativação;
+- [ ] configurar Access, aplicar migrations no `garage_db` e subir a API (roteiro BQTECH);
+- [ ] comprovar barreira (anônimo, desvio da borda e autenticado) antes de gravar dados;
+- [x] 3B: modo servidor explícito no Angular (carga, escrita com revisão, conflito, erro de rede);
+- [x] 3B: importação dos dados locais ou de arquivo usando a prévia da API;
+- [ ] executar `npm run server:test` em PostgreSQL descartável (migration 002, plano e importação);
+- [ ] validar o fluxo completo em produção depois da ativação.
 
 ### Sprint 6 recomendada — revisão das primeiras transcrições
 
@@ -105,7 +123,7 @@
 
 ### Experiência
 
-- editor de intervalos do plano com trilha da fonte;
+- editor de intervalos do catálogo com trilha da fonte, após revisão técnica;
 - tratamento de instalação e atualização da PWA;
 - auditoria automatizada de contraste e smoke test E2E em breakpoints adicionais;
 - importação de backups legados adicionais somente com migração explícita.

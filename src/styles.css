@@ -3339,3 +3339,20 @@ textarea::placeholder {
     transform: translateY(0);
   }
 }
+
+.owner-tag {
+  background: var(--accent-soft);
+  border-radius: 999px;
+  color: var(--accent-strong);
+  display: inline-flex;
+  font-size: 0.65rem;
+  font-weight: 800;
+  justify-self: start;
+  padding: 0.25rem 0.5rem;
+}
+
+.field-hint {
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}

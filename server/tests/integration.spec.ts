@@ -27,6 +27,7 @@ describe.skipIf(!safe).sequential('Garage PostgreSQL isolation', () => {
     pool,
     expectedUser: 'garage_test_user',
     expectedDatabase: 'garage_test_db',
+    access: { mode: 'disabled-local' },
   });
   const migrations = loadMigrations(resolve(process.cwd(), 'server/migrations'));
   let currentRevision = '0';
@@ -47,7 +48,10 @@ describe.skipIf(!safe).sequential('Garage PostgreSQL isolation', () => {
     );
     expect(before.rows[0].total).toBe(0);
     const files = await migrations;
-    expect(await runMigrations(pool, files)).toEqual(['001_initial.sql']);
+    expect(await runMigrations(pool, files)).toEqual([
+      '001_initial.sql',
+      '002_user_maintenance_schedule.sql',
+    ]);
     expect(await runMigrations(pool, files)).toEqual([]);
     await expect(runMigrations(pool, [{ ...files[0]!, checksum: '0'.repeat(64) }])).rejects.toThrow(
       'mismatch',
@@ -55,9 +59,9 @@ describe.skipIf(!safe).sequential('Garage PostgreSQL isolation', () => {
     await pool.query('DROP SCHEMA public CASCADE');
     await pool.query('CREATE SCHEMA public');
     const concurrent = await Promise.all([runMigrations(pool, files), runMigrations(pool, files)]);
-    expect(concurrent.map((result) => result.length).sort()).toEqual([0, 1]);
+    expect(concurrent.map((result) => result.length).sort()).toEqual([0, 2]);
     const recorded = await pool.query('SELECT count(*)::int AS total FROM schema_migrations');
-    expect(recorded.rows[0].total).toBe(1);
+    expect(recorded.rows[0].total).toBe(2);
     const tables = await pool.query(
       "SELECT count(*)::int AS total FROM information_schema.tables WHERE table_schema='public' AND table_name <> 'schema_migrations'",
     );
@@ -219,6 +223,89 @@ describe.skipIf(!safe).sequential('Garage PostgreSQL isolation', () => {
       later.maintenancePlan.find((r: { id: string }) => r.id === 'engine-oil').lastExecution
         .serviceRecordId,
     ).toBe(service.body.result.ids[0]);
+  });
+
+  it('creates, edits and removes owner-defined plan items without touching catalog data', async () => {
+    const created = await post(
+      '/api/garage/maintenance/items',
+      {
+        title: 'Calibragem dos pneus',
+        category: 'general',
+        intervalDays: 15,
+        warningDays: 3,
+        note: 'Hábito pessoal',
+      },
+      'plan-create',
+    );
+    expect(created.status).toBe(200);
+    currentRevision = created.body.revision;
+    const itemId = created.body.result.ids[0] as string;
+    expect(itemId.startsWith('user-')).toBe(true);
+    let state = (await request(app).get('/api/garage')).body.state;
+    expect(state.schemaVersion).toBe(5);
+    expect(state.maintenancePlan.find((r: { id: string }) => r.id === itemId)).toMatchObject({
+      origin: 'user',
+      title: 'Calibragem dos pneus',
+      userSchedule: { intervalDays: 15, warningDays: 3, note: 'Hábito pessoal' },
+      technicalSource: { status: 'needs-confirmation' },
+    });
+
+    const invalid = await post(
+      '/api/garage/maintenance/items',
+      { title: 'Sem intervalo', category: 'general' },
+      'plan-invalid',
+    );
+    expect(invalid.status).toBe(400);
+
+    const override = await post(
+      '/api/garage/maintenance/schedule',
+      { itemId: 'engine-oil', schedule: { intervalKm: 1000, warningKm: 100 } },
+      'plan-override',
+    );
+    expect(override.status).toBe(200);
+    currentRevision = override.body.revision;
+    state = (await request(app).get('/api/garage')).body.state;
+    const oil = state.maintenancePlan.find((r: { id: string }) => r.id === 'engine-oil');
+    expect(oil.origin).toBe('catalog');
+    expect(oil.userSchedule).toMatchObject({ intervalKm: 1000, warningKm: 100 });
+    expect(oil.technicalSource.status).toBe('needs-confirmation');
+    expect(oil.lastExecution).toBeDefined();
+
+    const renamedCatalog = await post(
+      '/api/garage/maintenance/items/update',
+      { itemId: 'engine-oil', title: 'Outro nome', category: 'engine', intervalKm: 1000 },
+      'plan-rename-catalog',
+    );
+    expect(renamedCatalog.status).toBe(400);
+    const removeCatalog = await post(
+      '/api/garage/maintenance/items/remove',
+      { itemId: 'engine-oil' },
+      'plan-remove-catalog',
+    );
+    expect(removeCatalog.status).toBe(409);
+
+    const cleared = await post(
+      '/api/garage/maintenance/schedule',
+      { itemId: 'engine-oil', schedule: null },
+      'plan-clear',
+    );
+    expect(cleared.status).toBe(200);
+    currentRevision = cleared.body.revision;
+    const removed = await post(
+      '/api/garage/maintenance/items/remove',
+      { itemId },
+      'plan-remove-user',
+    );
+    expect(removed.status).toBe(200);
+    currentRevision = removed.body.revision;
+    state = (await request(app).get('/api/garage')).body.state;
+    expect(state.maintenancePlan.some((r: { id: string }) => r.id === itemId)).toBe(false);
+    expect(
+      state.maintenancePlan.find((r: { id: string }) => r.id === 'engine-oil').userSchedule,
+    ).toBeUndefined();
+    await expect(
+      pool.query("UPDATE maintenance_plan_items SET origin = 'user' WHERE id = 'engine-oil'"),
+    ).rejects.toThrow();
   });
 
   it('preserves odometer on historical fuel and enforces explicit regression reason', async () => {
@@ -619,6 +706,7 @@ describe.skipIf(!safe).sequential('Garage PostgreSQL isolation', () => {
       pool: badPool,
       expectedUser: 'garage_test_user',
       expectedDatabase: 'garage_test_db',
+      access: { mode: 'disabled-local' },
     });
     const response = await request(badApp).get('/api/garage');
     expect(response.status).toBe(503);
@@ -627,5 +715,65 @@ describe.skipIf(!safe).sequential('Garage PostgreSQL isolation', () => {
       message: 'Garage is temporarily unavailable',
     });
     await badPool.end();
+  });
+
+  it('imports a local backup into an empty garage preserving ids, exactly once', async () => {
+    const exported = (await request(app).get('/api/garage')).body.state;
+    await pool.query('DROP SCHEMA public CASCADE');
+    await pool.query('CREATE SCHEMA public');
+    await runMigrations(pool, await migrations);
+    currentRevision = '0';
+    const backup = {
+      product: 'garage',
+      schemaVersion: 5,
+      exportedAt: '2026-11-26T12:00:00.000Z',
+      state: { ...exported, settings: { maintenanceAlertsEnabled: false, theme: 'light' } },
+    };
+
+    const preview = await request(app).post('/api/garage/import/preview').send({ backup });
+    expect(preview.status).toBe(200);
+    expect(preview.body).toMatchObject({ target: 'empty', settings: 'use-imported' });
+    expect(preview.body.summary.serviceRecords).toBe(exported.serviceHistory.length);
+
+    const tampered = await post(
+      '/api/garage/import',
+      { backup, digest: '0'.repeat(64) },
+      'import-tampered',
+    );
+    expect(tampered.status).toBe(409);
+
+    const imported = await post(
+      '/api/garage/import',
+      { backup, digest: preview.body.digest },
+      'import-1',
+    );
+    expect(imported.status).toBe(200);
+    currentRevision = imported.body.revision;
+    const replay = await post(
+      '/api/garage/import',
+      { backup, digest: preview.body.digest },
+      'import-1',
+      '0',
+    );
+    expect(replay.status).toBe(200);
+    expect(replay.body.revision).toBe(imported.body.revision);
+
+    const snapshot = (await request(app).get('/api/garage')).body;
+    expect(snapshot.status).toBe('configured-with-history');
+    expect(snapshot.state.motorcycle).toEqual(exported.motorcycle);
+    expect(snapshot.state.settings).toEqual({ maintenanceAlertsEnabled: false, theme: 'light' });
+    const ids = (values: { id: string }[]) => values.map((value) => value.id).sort();
+    expect(ids(snapshot.state.serviceHistory)).toEqual(ids(exported.serviceHistory));
+    expect(ids(snapshot.state.odometerHistory)).toEqual(ids(exported.odometerHistory));
+    expect(ids(snapshot.state.procedureExecutions)).toEqual(ids(exported.procedureExecutions));
+
+    const again = await post(
+      '/api/garage/import',
+      { backup, digest: preview.body.digest },
+      'import-2',
+    );
+    expect(again.status).toBe(409);
+    const occupied = await request(app).post('/api/garage/import/preview').send({ backup });
+    expect(occupied.body.target).toBe('occupied');
   });
 });

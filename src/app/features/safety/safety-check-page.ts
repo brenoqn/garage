@@ -105,7 +105,7 @@ import { GarageStore } from '../../core/services/garage-store.service';
           ><button
             class="button button-primary"
             type="submit"
-            [disabled]="completedCount() !== store.safetyChecklist().length"
+            [disabled]="completedCount() !== store.safetyChecklist().length || store.busy()"
           >
             Salvar inspeção
           </button>
@@ -138,8 +138,8 @@ export class SafetyCheckPage {
   protected setResponse(itemId: string, status: SafetyCheckItemStatus): void {
     this.responses.update((current) => ({ ...current, [itemId]: status }));
   }
-  protected save(): void {
-    const result = this.store.addSafetyCheck({
+  protected async save(): Promise<void> {
+    const result = await this.store.addSafetyCheck({
       checkedAt: new Date().toISOString(),
       responses: this.store.safetyChecklist().flatMap((item) => {
         const status = this.responseFor(item.id);

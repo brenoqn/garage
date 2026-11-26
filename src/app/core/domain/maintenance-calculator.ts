@@ -3,6 +3,7 @@ import {
   MaintenanceSchedule,
   MaintenanceStatus,
 } from '../models/maintenance.model';
+import { effectiveMaintenanceInterval } from './maintenance-plan';
 
 const DAY_IN_MS = 86_400_000;
 
@@ -77,7 +78,8 @@ export function calculateMaintenanceSchedule(
   currentMileage: number,
   today: string,
 ): MaintenanceSchedule {
-  if (item.technicalSource.status !== 'confirmed') {
+  const interval = effectiveMaintenanceInterval(item);
+  if (!interval) {
     return { status: 'unknown' };
   }
 
@@ -93,16 +95,18 @@ export function calculateMaintenanceSchedule(
   }
 
   const nextMileage =
-    item.intervalKm === undefined ? undefined : execution.mileage + item.intervalKm;
+    interval.intervalKm === undefined ? undefined : execution.mileage + interval.intervalKm;
   const nextDate =
-    item.intervalDays === undefined ? undefined : addDays(execution.date, item.intervalDays);
+    interval.intervalDays === undefined
+      ? undefined
+      : addDays(execution.date, interval.intervalDays);
   const remainingKm =
     nextMileage === undefined ? undefined : nextMileage - Math.max(0, currentMileage);
   const remainingDays =
     nextDate === undefined ? undefined : differenceInCalendarDays(nextDate, today);
 
-  const mileageStatus = statusFromRemaining(remainingKm, item.warningKm);
-  const dateStatus = statusFromRemaining(remainingDays, item.warningDays);
+  const mileageStatus = statusFromRemaining(remainingKm, interval.warningKm);
+  const dateStatus = statusFromRemaining(remainingDays, interval.warningDays);
   const candidates = [mileageStatus, dateStatus].filter((status) => status !== 'unknown');
   const status =
     candidates.length === 0

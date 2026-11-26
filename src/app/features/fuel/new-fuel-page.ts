@@ -116,7 +116,11 @@ import { GarageStore } from '../../core/services/garage-store.service';
         }
         <div class="form-actions sticky-form-actions">
           <a class="button button-secondary" routerLink="/fuel">Cancelar</a>
-          <button class="button button-primary" type="submit" [disabled]="form.invalid">
+          <button
+            class="button button-primary"
+            type="submit"
+            [disabled]="form.invalid || store.busy()"
+          >
             Salvar abastecimento
           </button>
         </div>
@@ -157,7 +161,7 @@ export class NewFuelPage {
     );
   }
 
-  protected save(): void {
+  protected async save(): Promise<void> {
     if (this.form.invalid || !this.store.setup().completed) {
       this.form.markAllAsTouched();
       return;
@@ -178,7 +182,7 @@ export class NewFuelPage {
       this.message.set(validation.error);
       return;
     }
-    if (!this.store.addFuel(input)) {
+    if (!(await this.store.addFuel(input))) {
       this.message.set('Não foi possível salvar. Seus dados anteriores foram preservados.');
       return;
     }

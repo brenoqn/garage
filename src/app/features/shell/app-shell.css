@@ -226,3 +226,13 @@ main {
     padding-bottom: 0;
   }
 }
+
+.server-gate {
+  display: grid;
+  gap: 1rem;
+  padding-block: 2rem;
+}
+
+.server-banner {
+  margin: 1rem;
+}

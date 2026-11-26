@@ -19,7 +19,15 @@ import { GarageStore } from '../../core/services/garage-store.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppShell {
-  private readonly store = inject(GarageStore);
+  protected readonly store = inject(GarageStore);
+  /** Modo servidor sem nenhum snapshot ainda: não renderizar telas com dados vazios. */
+  protected readonly waitingForServer = computed(
+    () => this.store.mode() === 'server' && !this.store.remoteLoaded(),
+  );
+  protected readonly remoteError = computed(() => {
+    const remote = this.store.remote();
+    return this.store.mode() === 'server' && remote.status === 'error' ? remote.message : '';
+  });
   protected readonly motorcycle = this.store.motorcycle;
   protected readonly modelLabel = computed(
     () => `${this.motorcycle().manufacturer} ${this.motorcycle().model}`,
@@ -31,6 +39,14 @@ export class AppShell {
     effect(() => {
       document.documentElement.dataset['theme'] = this.store.settings().theme;
     });
+  }
+
+  protected retryServer(): void {
+    void this.store.refreshRemote();
+  }
+
+  protected useLocal(): void {
+    this.store.useLocalMode();
   }
 
   protected closeQuickMenu(): void {

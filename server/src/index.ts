@@ -9,10 +9,11 @@ const app = createApp({
   pool,
   expectedUser: config.expectedUser,
   expectedDatabase: config.expectedDatabase,
+  access: config.access,
 });
 const server = createServer(app);
 
-server.listen(config.port, process.env['HOST'] ?? '0.0.0.0', () => {
+server.listen(config.port, config.host, () => {
   process.stdout.write(`Garage API listening on port ${config.port}\n`);
 });
 

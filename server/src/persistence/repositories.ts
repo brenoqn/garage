@@ -139,15 +139,28 @@ export class MaintenanceRepository {
     );
     return result.rows.map((r): MaintenancePlanItem => {
       const executionDate = optional(r['last_execution_date'], civilDate);
+      const scheduleUpdatedAt = optional(r['user_schedule_updated_at'], instant);
       return {
         id: str(r, 'id'),
         title: str(r, 'title'),
         category: str(r, 'category') as MaintenancePlanItem['category'],
+        origin: str(r, 'origin') as MaintenancePlanItem['origin'],
         procedureSlug: optText(r, 'procedure_slug'),
         intervalKm: optNum(r, 'interval_km'),
         intervalDays: optNum(r, 'interval_days'),
         warningKm: optNum(r, 'warning_km'),
         warningDays: optNum(r, 'warning_days'),
+        userSchedule:
+          scheduleUpdatedAt === undefined
+            ? undefined
+            : {
+                intervalKm: optNum(r, 'user_interval_km'),
+                intervalDays: optNum(r, 'user_interval_days'),
+                warningKm: optNum(r, 'user_warning_km'),
+                warningDays: optNum(r, 'user_warning_days'),
+                note: optText(r, 'user_note'),
+                updatedAt: scheduleUpdatedAt,
+              },
         technicalSource: {
           status: str(r, 'technical_status') as MaintenancePlanItem['technicalSource']['status'],
           label: str(r, 'technical_label'),
@@ -167,7 +180,7 @@ export class MaintenanceRepository {
   }
   async insert(motorcycleId: string, item: MaintenancePlanItem): Promise<void> {
     await this.db.query(
-      'INSERT INTO maintenance_plan_items (motorcycle_id,id,title,category,procedure_slug,interval_km,interval_days,warning_km,warning_days,technical_status,technical_label,technical_reference,claim_ids,last_execution_date,last_execution_mileage,last_service_record_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',
+      'INSERT INTO maintenance_plan_items (motorcycle_id,id,title,category,procedure_slug,interval_km,interval_days,warning_km,warning_days,technical_status,technical_label,technical_reference,claim_ids,last_execution_date,last_execution_mileage,last_service_record_id,origin,user_interval_km,user_interval_days,user_warning_km,user_warning_days,user_note,user_schedule_updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)',
       [
         motorcycleId,
         item.id,
@@ -185,7 +198,22 @@ export class MaintenanceRepository {
         item.lastExecution?.date ?? null,
         item.lastExecution?.mileage ?? null,
         item.lastExecution?.serviceRecordId ?? null,
+        item.origin,
+        ...scheduleColumns(item),
       ],
+    );
+  }
+  /** Atualiza somente nome/categoria do usuário e o intervalo dele; colunas editoriais não mudam. */
+  async updateUserFields(motorcycleId: string, item: MaintenancePlanItem): Promise<void> {
+    await this.db.query(
+      'UPDATE maintenance_plan_items SET title = $3, category = $4, user_interval_km = $5, user_interval_days = $6, user_warning_km = $7, user_warning_days = $8, user_note = $9, user_schedule_updated_at = $10 WHERE motorcycle_id = $1 AND id = $2',
+      [motorcycleId, item.id, item.title, item.category, ...scheduleColumns(item)],
+    );
+  }
+  async delete(motorcycleId: string, itemId: string): Promise<void> {
+    await this.db.query(
+      "DELETE FROM maintenance_plan_items WHERE motorcycle_id = $1 AND id = $2 AND origin = 'user'",
+      [motorcycleId, itemId],
     );
   }
   async setLastExecution(
@@ -198,6 +226,18 @@ export class MaintenanceRepository {
       [motorcycleId, itemId, service.date, service.mileage, service.id],
     );
   }
+}
+
+function scheduleColumns(item: MaintenancePlanItem): (number | string | null)[] {
+  const schedule = item.userSchedule;
+  return [
+    schedule?.intervalKm ?? null,
+    schedule?.intervalDays ?? null,
+    schedule?.warningKm ?? null,
+    schedule?.warningDays ?? null,
+    schedule?.note ?? null,
+    schedule?.updatedAt ?? null,
+  ];
 }
 
 export class ServiceRepository {

@@ -27,14 +27,15 @@ frontend por reexportação. `core/domain` contém regras e validações sem Ang
 ### Backend da Fase 3 (ainda sem ativação pública)
 
 O repositório também contém uma API Node.js 24/TypeScript estrito/Express 5 com `pg`, em
-`server/`. O frontend ainda usa LocalStorage e não chama essa API. Os contratos de dados do
-schema 4 estão em `shared/garage.ts`; os imports antigos de `core/models` reexportam esses
-tipos. As regras puras de odômetro, cronologia de serviço, combustível e checklist foram
-extraídas para `shared/`. As regras de execução de procedimento e a validação completa do
+`server/`. O frontend usa LocalStorage por padrão e só chama a API no modo servidor (abaixo). Os contratos de dados do
+schema 5 estão em `shared/garage.ts`; os imports antigos de `core/models` reexportam esses
+tipos. As regras puras de odômetro, cronologia de serviço, combustível, checklist e plano
+definido pelo usuário (`shared/maintenance-plan.ts`) ficam em `shared/`. As regras de execução de procedimento e a validação completa do
 estado seguem em `core/domain` e são reutilizadas pelo backend sem dependência Angular.
 
 ```text
-Angular (LocalStorage, ainda ativo)       Garage API (somente código/testes)
+Angular ── modo local ──→ LocalStorage
+   └──── modo servidor ──→ /api (Cloudflare Access) → Garage API
                                                ↓
                                          casos de uso e repositories
                                                ↓
@@ -42,11 +43,34 @@ Angular (LocalStorage, ainda ativo)       Garage API (somente código/testes)
 ```
 
 O banco remoto não armazena um JSON de `GarageState`. `GET /api/garage` monta o snapshot
-schema 4 a partir das tabelas relacionais sob leitura consistente; antes do setup, responde
+schema 5 a partir das tabelas relacionais sob leitura consistente; antes do setup, responde
 `not-configured`, revisão `0` e sem moto ou dados demonstrativos. Depois distingue
 `configured-empty` e `configured-with-history`. A revisão é separada de
 `schemaVersion`. Escritas exigem `expectedRevision` e `Idempotency-Key` e gravam o recibo
-na mesma transação dos dados. O frontend ainda não foi adaptado.
+na mesma transação dos dados. O frontend ainda não foi adaptado. A migration
+`002_user_maintenance_schedule.sql` acrescenta a origem do item e as colunas `user_*` do
+intervalo do proprietário, sem alterar as colunas editoriais; os comandos
+`/api/garage/maintenance/items`, `.../items/update`, `.../items/remove` e
+`/api/garage/maintenance/schedule` reutilizam as mesmas regras puras do frontend.
+
+**Barreira de acesso.** Todas as rotas `/api` passam por `server/src/http/access.ts`, que valida o
+JWT do Cloudflare Access (RS256, emissor do time, audiência, validade e lista opcional de
+e-mails), com as chaves públicas do time em cache. `/health` e `/ready` ficam fora. A API recusa
+iniciar sem `CF_ACCESS_TEAM_DOMAIN` e `CF_ACCESS_AUD`; a única exceção é
+`GARAGE_ACCESS_DISABLED=local-only` com `HOST` em loopback, para desenvolvimento. O runner de
+migrations usa só a configuração do banco.
+
+**Importação.** `POST /api/garage/import/preview` valida o backup sem gravar e devolve resumo,
+serviços demonstrativos excluídos, situação do destino e o hash SHA-256 do conteúdo normalizado
+(`core/domain/import-preparation.ts`). `POST /api/garage/import` exige o mesmo hash, garagem sem
+moto e insere o grafo com IDs e instantes preservados numa transação; o resultado é relido e
+comparado ao conteúdo importado, e qualquer diferença desfaz tudo. O hash é a chave de unicidade
+da importação em `write_operations`. Itens do catálogo desconhecidos ou com fonte confirmada que
+o catálogo não confirma bloqueiam a importação.
+
+**Empacotamento.** `Dockerfile.api` gera um bundle autocontido (`npm run server:bundle`) sobre
+Node.js 24, sem `node_modules` em runtime e sem executar migrations no startup. O roteiro de
+ativação está em `docs/BQTECH-API-ACTIVATION.md`.
 
 O executor em `server/src/persistence/migrate.ts` aplica SQL versionado por comando explícito,
 com checksum e advisory lock; o startup da API não executa migrations. A migration
@@ -107,7 +131,7 @@ O valor em `garage_state` é diretamente o agregado, sem envelope adicional:
 
 ```typescript
 interface GarageState {
-  schemaVersion: 4;
+  schemaVersion: 5;
   motorcycle: Motorcycle;
   maintenancePlan: readonly MaintenancePlanItem[];
   serviceHistory: readonly ServiceRecord[];
@@ -137,19 +161,40 @@ Estados já persistidos não são reescritos silenciosamente enquanto essas clai
 revisão aprovada. Uma sincronização futura de intervalos confirmados deverá ser explícita e
 preservar execuções e personalizações do usuário.
 
+### Plano definido pelo usuário (schema 5)
+
+Cada `MaintenancePlanItem` tem `origin`: `catalog` (item editorial do modelo) ou `user` (criado
+pelo proprietário, ID com prefixo reservado `user-`). Qualquer item pode ter `userSchedule`, o
+intervalo escolhido pelo proprietário. Esse valor não é afirmação técnica: não altera
+`intervalKm`/`intervalDays`, `technicalSource` ou claims e aparece sempre como “definido por
+você”. Itens do usuário não carregam intervalos do catálogo, procedimento editorial, claims nem
+fonte `confirmed`.
+
+`effectiveMaintenanceInterval` decide o que gera lembretes: o intervalo do usuário quando existe;
+senão, o do catálogo somente com fonte `confirmed`; senão, nada (`unknown`). Transcrições
+pendentes continuam sem contagem nem alerta. Itens do catálogo não podem ser renomeados nem
+removidos; itens do usuário só podem ser removidos quando nenhum serviço aponta para eles.
+
+O estado inicial não contém serviços, execuções nem quilometragem inventados
+(`setup.demoData: false`). Estados antigos com dados demonstrativos continuam limpos na
+configuração inicial, como antes. “Recomeçar do zero” volta ao estado inicial preservando
+somente as preferências.
+
 ## Migração e recuperação
 
 `decodeStoredGarageState` diferencia:
 
-- `empty`: usa o seed do schema 4;
-- `current`: aceita um schema 4 validado;
-- `migrated`: valida v3 e acrescenta coleções cotidianas vazias mais tema escuro; v2 acrescenta
-  antes `procedureExecutions: []`; v1 percorre v1 → v2 → v3 → v4;
+- `empty`: usa o seed do schema 5;
+- `current`: aceita um schema 5 validado;
+- `migrated`: v4 marca todos os itens do plano como `origin: 'catalog'`; v3 acrescenta antes
+  coleções cotidianas vazias mais tema escuro; v2 acrescenta antes `procedureExecutions: []`;
+  v1 percorre v1 → v2 → v3 → v4 → v5;
 - `invalid-state`: preserva o valor bruto e usa o seed somente em memória;
 - `future-version`: preserva uma versão que o aplicativo atual não conhece.
 
 A transformação v3 → v4 preserva todos os campos anteriores, acrescenta coleções vazias e inclui
-`settings.theme: 'dark'`. Depois da primeira gravação, decodificar o resultado não aplica outra
+`settings.theme: 'dark'`. A v4 → v5 preserva IDs, execuções e referências e não cria intervalos
+do usuário; um estado v4 que já traga `origin` ou `userSchedule` é recusado como inválido. Depois da primeira gravação, decodificar o resultado não aplica outra
 transformação. Estado
 inválido ou futuro nunca é substituído automaticamente; somente importação ou restauração
 confirmada libera o modo de recuperação.
@@ -179,10 +224,35 @@ As funções em `core/domain/procedure-execution.ts` criam, avançam, desmarcam,
 concluem, cancelam, reiniciam, selecionam a ativa e vinculam serviços. Componentes apenas
 coordenam interação e apresentação.
 
+## Modo local e modo servidor
+
+O destino dos dados é escolhido explicitamente em Ajustes e guardado na chave física
+`garage_mode`, separada de `garage_state`. O padrão é `local`. “Conectar ao servidor” só muda o
+modo depois de um `GET /api/garage` autenticado e válido; falha de Access, rede ou dados
+inválidos mantém o modo local. Voltar ao modo local relê `garage_state`, que nunca é apagado nem
+regravado no modo servidor.
+
+As escritas do `GarageStore` são assíncronas nos dois modos e os componentes aguardam o
+resultado antes de navegar ou confirmar. No modo local, as regras e a gravação continuam como
+abaixo. No modo servidor, o store envia o comando específico com `expectedRevision` e uma
+`Idempotency-Key` nova (`core/api/garage-api.client.ts`), e só publica nos Signals o snapshot
+relido depois da confirmação. Validações de UX (configuração concluída, regressão do odômetro,
+abastecimento histórico) rodam antes do envio; a validação final é do servidor.
+
+- **Conflito de revisão:** relê o snapshot e informa; nada é reenviado automaticamente.
+- **Rede ou sessão do Access:** marca o servidor como indisponível e bloqueia novas escritas até
+  uma releitura bem-sucedida. Um redirecionamento do Access é tratado como sessão expirada.
+- **Primeiro carregamento:** enquanto não há snapshot, o shell mostra carregamento ou erro e não
+  renderiza telas com dados vazios.
+- **Ações só locais:** “recomeçar do zero” e restaurar backup não existem no modo servidor.
+- **Importação:** com o servidor vazio, Ajustes oferece enviar os dados deste navegador (lidos
+  como cópia em memória) ou um arquivo; a prévia do servidor precede a confirmação, e a chave de
+  idempotência deriva do hash.
+
 ## Persistência transacional e vínculo com serviços
 
-Cada mutação constrói e valida o próximo `GarageState`, grava pela `StoragePort` e somente depois
-publica o novo Signal. Falha de gravação preserva a interface anterior e bloqueia novas mudanças
+No modo local, cada mutação constrói e valida o próximo `GarageState`, grava pela `StoragePort` e
+somente depois publica o novo Signal. Falha de gravação preserva a interface anterior e bloqueia novas mudanças
 até recuperação.
 
 Concluir um procedimento não altera plano, odômetro nem histórico de serviços. A tela concluída
@@ -198,14 +268,15 @@ O envelope existe somente no arquivo:
 ```typescript
 interface GarageBackup {
   product: 'garage';
-  schemaVersion: 4;
+  schemaVersion: 5;
   exportedAt: string;
   state: GarageState;
 }
 ```
 
-O backup inclui todos os dados do usuário, mas não o catálogo estático. A importação aceita schemas
-2 e 3, migra-os até 4, aceita schema 4 validado e recusa versões futuras. O resumo inclui as novas
+O backup inclui todos os dados do usuário, inclusive itens e intervalos definidos por ele, mas não
+o catálogo estático. A importação aceita schemas 2, 3 e 4, migra-os até 5, aceita schema 5
+validado e recusa versões futuras. O resumo inclui as novas
 coleções. Selecionar o arquivo não muda o store; uma confirmação separada substitui os dados.
 
 ## Catálogo e integridade
@@ -279,11 +350,12 @@ básica offline. O manifesto usa **Garage** e inicia em `/dashboard`. `npm run b
 
 ## Limitações atuais
 
-- um navegador, uma Honda NX200 e LocalStorage sem criptografia ou sincronização;
+- uma Honda NX200; modo local sem criptografia; modo servidor sem uso offline nem fila de envio;
 - transcrições do manual do proprietário ainda sem revisão técnica aprovada;
 - variante, código do motor e identidade física da motocicleta ainda não verificados;
 - manual de serviço e catálogo de peças ainda indisponíveis;
 - nenhuma claim confirmada para uso operacional;
 - temporizadores não persistem após fechar completamente o navegador;
 - Wake Lock depende de suporte e permissão do navegador;
-- sem imagens mecânicas, anexos, exclusão de execuções, push, backend ou autenticação.
+- sem imagens mecânicas, anexos, exclusão de execuções ou push; autenticação somente pelo
+  Cloudflare Access, sem contas próprias no Garage.

@@ -1,6 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { calculateMaintenanceSchedule } from '../../core/domain/maintenance-calculator';
+import {
+  describeEffectiveInterval,
+  pendingScheduleHint,
+} from '../../core/domain/maintenance-interval-description';
 import { MaintenancePlanItem, MaintenanceSchedule } from '../../core/models/maintenance.model';
 import { CurrentDateService } from '../../core/services/current-date.service';
 import { GarageStore } from '../../core/services/garage-store.service';
@@ -23,8 +27,8 @@ const priority = { overdue: 5, due: 4, upcoming: 3, ok: 2, unknown: 1 } as const
           <p class="eyebrow">O que vem agora</p>
           <h1>Próximas manutenções</h1>
           <p>
-            Prioridades calculadas pela data e pela quilometragem, somente quando a fonte está
-            revisada.
+            Prioridades calculadas pela data e pela quilometragem, a partir do seu intervalo ou de
+            uma fonte técnica revisada.
           </p>
         </div>
         <a class="button button-primary" routerLink="/maintenance/new">Registrar serviço</a>
@@ -65,13 +69,13 @@ const priority = { overdue: 5, due: 4, upcoming: 3, ok: 2, unknown: 1 } as const
         </section>
       } @else {
         <section class="empty-state card honest-empty">
-          <span aria-hidden="true">◇</span><strong>Nenhum prazo operacional revisado</strong>
+          <span aria-hidden="true">◇</span><strong>Nenhum prazo em contagem</strong>
           <p>
-            Os intervalos da NX200 foram localizados no manual aplicável, mas ainda estão marcados
-            como transcrição pendente de revisão. Eles não geram contagem nem alerta até essa etapa
-            editorial.
+            Os intervalos da NX200 foram localizados no manual aplicável, mas ainda aguardam revisão
+            técnica e não geram alerta. Defina o seu próprio intervalo nos itens do plano e registre
+            a última execução para começar a contar.
           </p>
-          <a class="button button-secondary" routerLink="/technical-sources">Ver fontes técnicas</a>
+          <a class="button button-secondary" routerLink="/maintenance">Definir meus intervalos</a>
         </section>
       }
       @if (pendingRows().length) {
@@ -79,7 +83,7 @@ const priority = { overdue: 5, due: 4, upcoming: 3, ok: 2, unknown: 1 } as const
           <div class="section-heading">
             <div>
               <p class="eyebrow">Visível, sem alarme</p>
-              <h2>Cronograma pendente de revisão</h2>
+              <h2>Ainda sem previsão</h2>
             </div>
           </div>
           <div class="record-list">
@@ -87,7 +91,7 @@ const priority = { overdue: 5, due: 4, upcoming: 3, ok: 2, unknown: 1 } as const
               <article class="card pending-schedule-row">
                 <div>
                   <strong>{{ row.item.title }}</strong
-                  ><small>{{ interval(row.item) }}</small>
+                  ><small>{{ interval(row) }}</small>
                 </div>
                 <app-status-badge status="unknown" />
               </article>
@@ -133,12 +137,9 @@ export class UpcomingMaintenancePage {
     if (schedule.remainingDays !== undefined) return `${schedule.remainingDays} dia(s) restantes`;
     return 'Sem previsão';
   }
-  protected interval(item: MaintenancePlanItem): string {
-    const parts = [
-      item.intervalKm ? `${item.intervalKm.toLocaleString('pt-BR')} km` : '',
-      item.intervalDays ? `${item.intervalDays} dias` : '',
-    ].filter(Boolean);
-    return parts.length ? `Intervalo transcrito: ${parts.join(' ou ')}` : 'Intervalo a confirmar';
+  protected interval({ item, schedule }: UpcomingRow): string {
+    const hint = this.store.setup().completed ? pendingScheduleHint(item, schedule) : null;
+    return hint ? `${describeEffectiveInterval(item)} · ${hint}` : describeEffectiveInterval(item);
   }
   protected date(value: string): string {
     return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeZone: 'UTC' }).format(

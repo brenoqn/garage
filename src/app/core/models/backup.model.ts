@@ -1,25 +1,14 @@
+import type { GarageBackupSummary } from '../../../../shared/garage';
 import { GarageState } from './garage-state.model';
 
 export interface GarageBackup {
   readonly product: 'garage';
-  readonly schemaVersion: 4;
+  readonly schemaVersion: 5;
   readonly exportedAt: string;
   readonly state: GarageState;
 }
 
-export interface GarageBackupSummary {
-  readonly motorcycle: string;
-  readonly year: number;
-  readonly currentMileage: number;
-  readonly serviceRecords: number;
-  readonly odometerRecords: number;
-  readonly maintenanceItems: number;
-  readonly procedureExecutions: number;
-  readonly fuelRecords: number;
-  readonly expenseRecords: number;
-  readonly occurrenceRecords: number;
-  readonly safetyChecks: number;
-}
+export type { GarageBackupSummary };
 
 export type GarageBackupParseResult =
   | {

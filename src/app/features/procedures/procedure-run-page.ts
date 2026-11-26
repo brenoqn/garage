@@ -473,51 +473,54 @@ export class ProcedureRunPage implements OnDestroy {
     return (this.procedure()?.steps.indexOf(step) ?? 0) + 1;
   }
 
-  protected complete(stepId: string): void {
-    const result = this.store.completeProcedureStep(this.execution()?.id ?? '', stepId);
+  protected async complete(stepId: string): Promise<void> {
+    const result = await this.store.completeProcedureStep(this.execution()?.id ?? '', stepId);
     this.apply(result);
     if (result.ok) {
       this.cancelTimer();
       this.focusCurrentStep();
     }
   }
-  protected uncomplete(stepId: string): void {
-    this.apply(this.store.uncompleteProcedureStep(this.execution()?.id ?? '', stepId));
+  protected async uncomplete(stepId: string): Promise<void> {
+    this.apply(await this.store.uncompleteProcedureStep(this.execution()?.id ?? '', stepId));
   }
-  protected skip(stepId: string): void {
-    const result = this.store.skipOptionalProcedureStep(this.execution()?.id ?? '', stepId);
+  protected async skip(stepId: string): Promise<void> {
+    const result = await this.store.skipOptionalProcedureStep(this.execution()?.id ?? '', stepId);
     this.apply(result);
     if (result.ok) {
       this.cancelTimer();
       this.focusCurrentStep();
     }
   }
-  protected backStep(): void {
+  protected async backStep(): Promise<void> {
     const stepId = this.lastCompletedStepId();
     if (stepId) {
-      this.uncomplete(stepId);
+      await this.uncomplete(stepId);
       this.focusCurrentStep();
     }
   }
-  protected toggleFinalCheck(checkId: string, event: Event): void {
+  protected async toggleFinalCheck(checkId: string, event: Event): Promise<void> {
     this.apply(
-      this.store.setProcedureFinalCheck(
+      await this.store.setProcedureFinalCheck(
         this.execution()?.id ?? '',
         checkId,
         (event.target as HTMLInputElement).checked,
       ),
     );
   }
-  protected finish(): void {
-    const result = this.store.finishProcedure(this.execution()?.id ?? '', this.noteControl.value);
+  protected async finish(): Promise<void> {
+    const result = await this.store.finishProcedure(
+      this.execution()?.id ?? '',
+      this.noteControl.value,
+    );
     this.apply(result);
     if (result.ok) {
       void this.wakeLock.release();
       this.workshopMode.set(false);
     }
   }
-  protected cancel(): void {
-    const result = this.store.cancelProcedure(this.execution()?.id ?? '');
+  protected async cancel(): Promise<void> {
+    const result = await this.store.cancelProcedure(this.execution()?.id ?? '');
     this.apply(result);
     if (result.ok) {
       this.confirmCancel.set(false);
@@ -525,8 +528,8 @@ export class ProcedureRunPage implements OnDestroy {
       this.workshopMode.set(false);
     }
   }
-  protected restart(): void {
-    const result = this.store.restartProcedure(this.execution()?.id ?? '');
+  protected async restart(): Promise<void> {
+    const result = await this.store.restartProcedure(this.execution()?.id ?? '');
     this.confirmRestart.set(false);
     if (!result.ok) {
       this.message.set(result.error);
@@ -586,7 +589,7 @@ export class ProcedureRunPage implements OnDestroy {
     void this.wakeLock.release();
   }
 
-  private apply(result: ReturnType<GarageStore['completeProcedureStep']>): void {
+  private apply(result: Awaited<ReturnType<GarageStore['completeProcedureStep']>>): void {
     this.message.set(result.ok ? '' : result.error);
   }
   protected durationLabel(startedAt: string): string {

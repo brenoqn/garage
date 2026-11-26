@@ -41,7 +41,7 @@ describe('ProcedureRunPage', () => {
       ],
     }).compileComponents();
     const store = TestBed.inject(GarageStore);
-    const started = store.startProcedure(
+    const started = await store.startProcedure(
       procedure.slug,
       procedure.safetyWarnings.map((warning) => warning.id),
     );

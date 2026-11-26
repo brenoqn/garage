@@ -46,10 +46,12 @@ describe('ProcedurePreparePage', () => {
 
     for (const checkbox of fixture.nativeElement.querySelectorAll('input[type="checkbox"]')) {
       (checkbox as HTMLInputElement).click();
+      await new Promise((resolve) => setTimeout(resolve));
     }
     fixture.detectChanges();
     expect(button.disabled).toBe(false);
     button.click();
+    await new Promise((resolve) => setTimeout(resolve));
     fixture.detectChanges();
     expect(router.navigate).toHaveBeenCalledWith([
       '/procedures',

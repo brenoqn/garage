@@ -45,6 +45,22 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'maintenance/items/new',
+        title: 'Novo item do plano | Garage',
+        loadComponent: () =>
+          import('./features/maintenance/maintenance-item-page').then(
+            (component) => component.MaintenanceItemPage,
+          ),
+      },
+      {
+        path: 'maintenance/items/:id',
+        title: 'Intervalo do plano | Garage',
+        loadComponent: () =>
+          import('./features/maintenance/maintenance-item-page').then(
+            (component) => component.MaintenanceItemPage,
+          ),
+      },
+      {
         path: 'maintenance/new',
         title: 'Registrar manutenção | Garage',
         loadComponent: () =>

@@ -1,5 +1,6 @@
 import { Injectable, InjectionToken } from '@angular/core';
 import { calculateMaintenanceSchedule } from '../domain/maintenance-calculator';
+import { effectiveMaintenanceInterval } from '../domain/maintenance-plan';
 import {
   MaintenanceAlert,
   MaintenancePlanItem,
@@ -69,12 +70,13 @@ export class InAppNotificationService implements NotificationService {
 
   private reason(item: MaintenancePlanItem, schedule: MaintenanceSchedule): string {
     const reasons: string[] = [];
+    const interval = effectiveMaintenanceInterval(item);
     if (schedule.remainingKm !== undefined) {
       if (schedule.remainingKm < 0) {
         reasons.push('quilometragem prevista ultrapassada');
       } else if (schedule.remainingKm === 0) {
         reasons.push('quilometragem prevista atingida');
-      } else if (item.warningKm !== undefined && schedule.remainingKm <= item.warningKm) {
+      } else if (interval?.warningKm !== undefined && schedule.remainingKm <= interval.warningKm) {
         reasons.push('dentro da antecedência por quilometragem');
       }
     }
@@ -83,11 +85,15 @@ export class InAppNotificationService implements NotificationService {
         reasons.push('data prevista ultrapassada');
       } else if (schedule.remainingDays === 0) {
         reasons.push('data prevista atingida');
-      } else if (item.warningDays !== undefined && schedule.remainingDays <= item.warningDays) {
+      } else if (
+        interval?.warningDays !== undefined &&
+        schedule.remainingDays <= interval.warningDays
+      ) {
         reasons.push('dentro da antecedência por data');
       }
     }
-    return reasons.join(' e ');
+    const text = reasons.join(' e ');
+    return interval?.basis === 'user' && text ? `${text} (intervalo definido por você)` : text;
   }
 
   private describe(schedule: MaintenanceSchedule): string {

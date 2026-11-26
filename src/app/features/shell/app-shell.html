@@ -66,7 +66,43 @@
         >{{ motorcycle().nickname }}<span aria-hidden="true">›</span></a
       >
     </header>
-    <main id="main-content" tabindex="-1"><router-outlet /></main>
+    <main id="main-content" tabindex="-1">
+      @if (waitingForServer()) {
+        <section class="page page-narrow server-gate" aria-live="polite">
+          @if (remoteError(); as message) {
+            <div class="recovery-banner" role="alert">
+              <div>
+                <strong>Não foi possível carregar seus dados do servidor</strong>
+                <p>{{ message }}</p>
+              </div>
+            </div>
+            <div class="settings-actions">
+              <button class="button button-primary" type="button" (click)="retryServer()">
+                Tentar de novo
+              </button>
+              <button class="button button-secondary" type="button" (click)="useLocal()">
+                Usar somente este navegador
+              </button>
+            </div>
+          } @else {
+            <p class="settings-footnote" role="status">Carregando seus dados do servidor…</p>
+          }
+        </section>
+      } @else {
+        @if (remoteError(); as message) {
+          <div class="recovery-banner server-banner" role="alert">
+            <div>
+              <strong>Servidor indisponível</strong>
+              <p>{{ message }} Alterações ficam bloqueadas até reconectar.</p>
+            </div>
+            <button class="button button-secondary" type="button" (click)="retryServer()">
+              Tentar de novo
+            </button>
+          </div>
+        }
+        <router-outlet />
+      }
+    </main>
   </div>
 
   <nav class="bottom-nav" aria-label="Navegação principal">

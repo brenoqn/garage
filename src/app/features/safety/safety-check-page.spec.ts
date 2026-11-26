@@ -43,10 +43,12 @@ describe('SafetyCheckPage', () => {
       '.safety-choice button:first-child',
     )) {
       (button as HTMLButtonElement).click();
+      await new Promise((resolve) => setTimeout(resolve));
     }
     fixture.detectChanges();
     expect(submit.disabled).toBe(false);
     submit.click();
+    await new Promise((resolve) => setTimeout(resolve));
     expect(router.navigate).toHaveBeenCalledWith(['/history']);
   });
 });

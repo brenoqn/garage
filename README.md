@@ -45,7 +45,10 @@ Angular. O aplicativo publicado continua no modo local.
 - detecção automática de conflitos e validação bloqueante do conteúdo;
 - tema escuro padrão, opções claro e sistema, tokens CSS e preferência persistida;
 - navegação móvel priorizando Início, Manutenção, Fazer, Abastecer e Histórico;
-- estado local no schema 4, migração encadeada dos formatos anteriores e recuperação segura;
+- primeiro uso limpo, sem serviços ou quilometragem inventados;
+- plano com itens e intervalos definidos pelo proprietário, sempre identificados como
+  “definido por você” e separados do conteúdo técnico;
+- estado local no schema 5, migração encadeada dos formatos anteriores e recuperação segura;
 - exportação e importação de backup JSON com validação, resumo e confirmação;
 - navegação responsiva, PWA instalável e service worker de produção;
 - testes de domínio, store, migração, backup, procedimentos, componentes e Wake Lock.
@@ -103,14 +106,16 @@ npm run build:sites
 
 ## Persistência, migração e backup
 
-O `LocalStorage` guarda diretamente um `GarageState` com `schemaVersion: 4` na chave física
-`garage_state`. O schema 4 acrescenta abastecimentos, gastos, ocorrências, inspeções pré-rodagem
-e preferência de tema. Estados do schema 3 recebem coleções vazias e tema escuro; o schema 2
+O `LocalStorage` guarda diretamente um `GarageState` com `schemaVersion: 5` na chave física
+`garage_state`. O schema 5 acrescenta a origem dos itens do plano (`catalog` ou `user`) e o
+intervalo definido pelo proprietário; o schema 4 havia acrescentado abastecimentos, gastos,
+ocorrências, inspeções pré-rodagem e preferência de tema. Estados do schema 4 têm todos os itens
+marcados como `catalog`; os do schema 3 recebem antes coleções vazias e tema escuro; o schema 2
 recebe antes `procedureExecutions: []`. O formato `version: 1` percorre toda a cadeia
-v1 → v2 → v3 → v4. Cada etapa é validada, idempotente e preserva o conteúdo anterior.
+v1 → v2 → v3 → v4 → v5. Cada etapa é validada, idempotente e preserva o conteúdo anterior.
 
 Se o valor local for inválido ou pertencer a uma versão futura, ele não é sobrescrito. O
-Garage inicia um estado demonstrativo somente em memória, informa o problema e permite
+Garage inicia um estado inicial vazio somente em memória, informa o problema e permite
 exportar o conteúdo original em Ajustes. Somente uma restauração ou importação confirmada
 substitui esse valor.
 
@@ -119,7 +124,7 @@ O backup usa um envelope separado:
 ```json
 {
   "product": "garage",
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "exportedAt": "2026-08-02T12:00:00.000Z",
   "state": {}
 }
@@ -127,11 +132,13 @@ O backup usa um envelope separado:
 
 Procedimentos, itens estáticos do checklist e especificações não entram no backup. Execuções,
 serviços, plano, odômetro, abastecimentos, gastos, ocorrências, inspeções e preferências entram.
-Backups dos schemas 2 e 3 são aceitos e migrados; schema 4 é validado diretamente; versões
+Backups dos schemas 2, 3 e 4 são aceitos e migrados; schema 5 é validado diretamente; versões
 futuras são recusadas. Serviços demonstrativos reconstruíveis e suas referências são removidos.
 
-O aplicativo não possui backend, conta de usuário, sincronização ou notificações push nesta
-etapa. O backup é a forma disponível de transferir dados entre navegadores ou dispositivos.
+Por padrão, os dados ficam somente neste navegador. Em Ajustes é possível conectar ao servidor
+do Garage (Garage API atrás do Cloudflare Access, veja `docs/BQTECH-API-ACTIVATION.md`) e
+importar os dados locais para ele; os dados do navegador não são apagados. Não há contas próprias
+nem notificações push.
 
 ## Migração de origem
 

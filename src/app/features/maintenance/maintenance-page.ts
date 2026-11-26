@@ -2,6 +2,10 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { RouterLink } from '@angular/router';
 import { calculateMaintenanceSchedule } from '../../core/domain/maintenance-calculator';
 import {
+  describeEffectiveInterval,
+  pendingScheduleHint,
+} from '../../core/domain/maintenance-interval-description';
+import {
   MaintenancePlanItem,
   MaintenanceSchedule,
   MaintenanceStatus,
@@ -30,6 +34,9 @@ interface PlanRow {
         </div>
         <div class="header-actions">
           <a class="button button-secondary" routerLink="/maintenance/upcoming">Ver próximas</a>
+          @if (store.setup().completed) {
+            <a class="button button-secondary" routerLink="/maintenance/items/new">＋ Novo item</a>
+          }
           <a
             class="button button-primary"
             [routerLink]="store.setup().completed ? '/maintenance/new' : '/motorcycle'"
@@ -42,10 +49,10 @@ interface PlanRow {
       @if (!store.setup().completed) {
         <section class="setup-banner" role="status">
           <div>
-            <strong>Plano em modo demonstrativo</strong>
+            <strong>Configure sua moto para ativar o plano</strong>
             <p>
-              Conclua a configuração inicial para confirmar a quilometragem. Alertas e contagens
-              operacionais estão pausados.
+              Conclua a configuração inicial para confirmar a quilometragem. Até lá, alertas e
+              contagens ficam pausados.
             </p>
           </div>
           <a class="button button-secondary" routerLink="/motorcycle">Configurar agora</a>
@@ -86,8 +93,9 @@ interface PlanRow {
       <div class="source-warning">
         <span aria-hidden="true">!</span>
         <p>
-          Itens sem fonte técnica confirmada permanecem visíveis como “Dados pendentes de
-          validação”, mas não são classificados como próximos, devidos ou vencidos.
+          Os intervalos transcritos do manual ainda aguardam revisão técnica e não geram lembretes.
+          Para ser avisado, defina o seu próprio intervalo em cada item: ele vale só para a sua moto
+          e aparece como “definido por você”.
         </p>
       </div>
 
@@ -101,6 +109,9 @@ interface PlanRow {
               <div>
                 <strong>{{ row.item.title }}</strong>
                 <small>{{ intervalDescription(row.item) }}</small>
+                @if (row.item.origin === 'user') {
+                  <span class="owner-tag">Criado por você</span>
+                }
               </div>
               <app-status-badge [status]="row.schedule.status" />
             </div>
@@ -112,13 +123,18 @@ interface PlanRow {
               </div>
               <div>
                 <dt>Próxima estimada</dt>
-                <dd>{{ scheduleDescription(row.schedule) }}</dd>
+                <dd>{{ scheduleDescription(row) }}</dd>
               </div>
             </dl>
 
             <div class="maintenance-actions">
               @if (row.item.procedureSlug) {
                 <a [routerLink]="['/procedures', row.item.procedureSlug]">Ver procedimento</a>
+              }
+              @if (store.setup().completed) {
+                <a [routerLink]="['/maintenance/items', row.item.id]">
+                  {{ row.item.userSchedule ? 'Editar intervalo' : 'Definir intervalo' }}
+                </a>
               }
               <a
                 [routerLink]="store.setup().completed ? '/maintenance/new' : '/motorcycle'"
@@ -189,17 +205,7 @@ export class MaintenancePage {
   }
 
   protected intervalDescription(item: MaintenancePlanItem): string {
-    if (item.technicalSource.status !== 'confirmed') {
-      return 'Dados pendentes de validação';
-    }
-    const parts: string[] = [];
-    if (item.intervalKm) {
-      parts.push(`a cada ${item.intervalKm.toLocaleString('pt-BR')} km`);
-    }
-    if (item.intervalDays) {
-      parts.push(`a cada ${item.intervalDays} dias`);
-    }
-    return parts.join(' ou ') || 'Intervalo a confirmar';
+    return describeEffectiveInterval(item);
   }
 
   protected executionDescription(item: MaintenancePlanItem): string {
@@ -210,9 +216,11 @@ export class MaintenancePage {
     return `${this.formatDate(execution.date)} · ${execution.mileage.toLocaleString('pt-BR')} km`;
   }
 
-  protected scheduleDescription(schedule: MaintenanceSchedule): string {
+  protected scheduleDescription({ item, schedule }: PlanRow): string {
     if (schedule.status === 'unknown') {
-      return 'Dados pendentes de validação';
+      return this.store.setup().completed
+        ? (pendingScheduleHint(item, schedule) ?? 'Sem previsão')
+        : 'Configure sua moto primeiro';
     }
     const parts: string[] = [];
     if (schedule.nextMileage !== undefined) {

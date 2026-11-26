@@ -4,7 +4,7 @@ import { GarageState } from '../models/garage-state.model';
 import { createGarageBackup, parseGarageBackup } from './backup';
 
 const state: GarageState = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   motorcycle: {
     id: 'nx200-primary',
     manufacturer: 'Honda',
@@ -28,11 +28,11 @@ const state: GarageState = {
 };
 
 describe('Garage backup', () => {
-  it('exports schema 4 with every user-owned collection', () => {
+  it('exports schema 5 with every user-owned collection', () => {
     const content = createGarageBackup(state, '2026-07-30T12:00:00.000Z');
     const parsed = JSON.parse(content) as Record<string, unknown>;
     expect(parsed['product']).toBe('garage');
-    expect(parsed['schemaVersion']).toBe(4);
+    expect(parsed['schemaVersion']).toBe(5);
     expect(parsed['exportedAt']).toBe('2026-07-30T12:00:00.000Z');
     expect(parsed['state']).toEqual(state);
     expect(content).not.toContain('NX200_PROCEDURES');
@@ -49,6 +49,7 @@ describe('Garage backup', () => {
             id: 'oil',
             title: 'Óleo',
             category: 'engine',
+            origin: 'catalog',
             technicalSource: { status: 'needs-confirmation', label: 'Demonstração' },
             lastExecution: { date: '2026-01-01', mileage: 1_000, serviceRecordId: 'demo-oil' },
           },
@@ -89,7 +90,58 @@ describe('Garage backup', () => {
     }
   });
 
-  it('accepts a valid schema 2 backup and migrates it to schema 4', () => {
+  it('round-trips owner-defined plan items and schedules', () => {
+    const withUserPlan: GarageState = {
+      ...state,
+      maintenancePlan: [
+        {
+          id: 'user-tires',
+          title: 'Calibragem',
+          category: 'general',
+          origin: 'user',
+          userSchedule: { intervalDays: 15, updatedAt: '2026-11-26T10:00:00.000Z' },
+          technicalSource: { status: 'needs-confirmation', label: 'Item criado por você.' },
+        },
+      ],
+    };
+    const result = parseGarageBackup(
+      createGarageBackup(withUserPlan, '2026-11-26T12:00:00.000Z'),
+      NX200_PROCEDURES,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.backup.state).toEqual(withUserPlan);
+  });
+
+  it('accepts a schema 4 backup and marks its plan items as catalog', () => {
+    const legacyState = {
+      ...state,
+      schemaVersion: 4,
+      maintenancePlan: [
+        {
+          id: 'oil',
+          title: 'Óleo',
+          category: 'engine',
+          technicalSource: { status: 'needs-confirmation', label: 'Transcrição' },
+        },
+      ],
+    };
+    const result = parseGarageBackup(
+      JSON.stringify({
+        product: 'garage',
+        schemaVersion: 4,
+        exportedAt: '2026-10-01T12:00:00.000Z',
+        state: legacyState,
+      }),
+      NX200_PROCEDURES,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.backup.schemaVersion).toBe(5);
+      expect(result.backup.state.maintenancePlan[0]?.origin).toBe('catalog');
+    }
+  });
+
+  it('accepts a valid schema 2 backup and migrates it to schema 5', () => {
     const legacyState = { ...state, schemaVersion: 2 } as Record<string, unknown>;
     delete legacyState['procedureExecutions'];
     const result = parseGarageBackup(
@@ -103,7 +155,7 @@ describe('Garage backup', () => {
     );
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.backup.schemaVersion).toBe(4);
+      expect(result.backup.schemaVersion).toBe(5);
       expect(result.backup.state.procedureExecutions).toEqual([]);
     }
   });

@@ -4,9 +4,11 @@ import { Procedure } from '../models/procedure.model';
 import {
   migrateGarageStateV2,
   migrateGarageStateV3,
+  migrateGarageStateV4,
   validateGarageState,
   validateGarageStateV2,
   validateGarageStateV3,
+  validateGarageStateV4,
 } from './garage-state-migration';
 
 export function createGarageBackup(state: GarageState, exportedAt: string): string {
@@ -32,7 +34,7 @@ export function createGarageBackup(state: GarageState, exportedAt: string): stri
   };
   const backup: GarageBackup = {
     product: 'garage',
-    schemaVersion: 4,
+    schemaVersion: 5,
     exportedAt,
     state: backupState,
   };
@@ -93,7 +95,8 @@ export function parseGarageBackup(
   if (
     candidate['schemaVersion'] !== 2 &&
     candidate['schemaVersion'] !== 3 &&
-    candidate['schemaVersion'] !== 4
+    candidate['schemaVersion'] !== 4 &&
+    candidate['schemaVersion'] !== 5
   ) {
     return {
       ok: false,
@@ -114,7 +117,7 @@ export function parseGarageBackup(
 
   const backup: GarageBackup = {
     product: 'garage',
-    schemaVersion: 4,
+    schemaVersion: 5,
     exportedAt: candidate['exportedAt'],
     state,
   };
@@ -123,18 +126,24 @@ export function parseGarageBackup(
 
 function parseBackupState(
   value: unknown,
-  schemaVersion: 2 | 3 | 4,
+  schemaVersion: 2 | 3 | 4 | 5,
   procedures: readonly Procedure[],
 ): GarageState | string {
   if (schemaVersion === 2) {
     const validation = validateGarageStateV2(value);
     return validation.valid
-      ? migrateGarageStateV3(migrateGarageStateV2(validation.state))
+      ? migrateGarageStateV4(migrateGarageStateV3(migrateGarageStateV2(validation.state)))
       : validation.error;
   }
   if (schemaVersion === 3) {
     const validation = validateGarageStateV3(value, procedures);
-    return validation.valid ? migrateGarageStateV3(validation.state) : validation.error;
+    return validation.valid
+      ? migrateGarageStateV4(migrateGarageStateV3(validation.state))
+      : validation.error;
+  }
+  if (schemaVersion === 4) {
+    const validation = validateGarageStateV4(value, procedures);
+    return validation.valid ? migrateGarageStateV4(validation.state) : validation.error;
   }
   const validation = validateGarageState(value, procedures);
   return validation.valid ? validation.state : validation.error;

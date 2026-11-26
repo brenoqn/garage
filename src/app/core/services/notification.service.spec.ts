@@ -9,6 +9,7 @@ function item(id: string, changes: Partial<MaintenancePlanItem> = {}): Maintenan
     id,
     title: `Item ${id}`,
     category: 'general',
+    origin: 'catalog',
     intervalKm: 1_000,
     warningKm: 200,
     lastExecution: { date: '2026-07-01', mileage: 10_000 },

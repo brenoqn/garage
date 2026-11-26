@@ -68,7 +68,7 @@ interface, metadados e documentação.
 30. Claims transcritas exigem página e seção. Não extrapole o manual do proprietário para
     desmontagem ou reparos ausentes; continue exigindo manual de serviço para torques,
     tolerâncias internas, diagramas completos e desmontagem avançada.
-31. O schema atual é 4. Abastecimentos, gastos, ocorrências e inspeções pré-rodagem são dados do
+31. O schema atual é 5. Abastecimentos, gastos, ocorrências e inspeções pré-rodagem são dados do
     usuário e entram no backup; descrições estáticas do checklist continuam em `data`.
 32. Calcule consumo somente entre marcações válidas de tanque completo e sequência crescente do
     odômetro. Some os abastecimentos parciais abertos ao intervalo seguinte; eles não fecham uma

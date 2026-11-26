@@ -1,9 +1,9 @@
 import { resolve } from 'node:path';
-import { loadConfig } from './config/env';
+import { loadDatabaseConfig } from './config/env';
 import { loadMigrations, runMigrations } from './persistence/migrate';
 import { createPool } from './persistence/pool';
 
-const pool = createPool(loadConfig());
+const pool = createPool(loadDatabaseConfig());
 try {
   const directory = resolve(process.cwd(), 'server/migrations');
   const applied = await runMigrations(pool, await loadMigrations(directory));
